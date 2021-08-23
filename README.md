@@ -6,14 +6,18 @@ This is the official [GASP](http://software.knowledge-technology.info/#gasp) cod
 [IJCAI 2021](https://ijcai-21.org). If you find this work useful, please cite our [paper](https://www2alt.informatik.uni-hamburg.de/wtm/publications/2021/AWW21/index.php):
 
 ```
-@inproceedings{abawi2021gasp,
-  title={{GASP: Gated Attention for Saliency Prediction}},
-  author={Abawi, Fares and Weber, Tom and Wermter, Stefan},
-  booktitle={Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence (IJCAI)},
-  pages={584--591},
-  year={2021},
-  doi={10.24963/ijcai.2021/81},
-  publisher={IJCAI Organization}
+@InProceedings{AWW21,
+  author       = "Abawi, Fares and Weber, Tom and Wermter, Stefan",
+  title        = "{GASP: Gated Attention for Saliency Prediction}",
+  booktitle    = "{Proceedings of the Thirtieth International Joint Conference on Artificial Intelligence (IJCAI-21)}",
+  pages        = "584--591",
+  month        = "Aug",
+  year         = "2021",
+  publisher    = "{International Joint Conferences on Artificial Intelligence}",
+  organization = "{IJCAI Organization}",
+  key          = "abawi2021gasp",
+  doi          = "10.24963/ijcai.2021/81",
+  url          = "https://www2.informatik.uni-hamburg.de/wtm/publications/2021/AWW21/Abawi_IJCAI21.pdf"
 }
 ```
 
