@@ -1,0 +1,102 @@
+{
+    "audio_features": {
+        "audio_features": "MFCCAudioFeatures",
+        "hann_audio_frames": "WindowedAudioFeatures"
+    },
+    "compute_metrics": true,
+    "datasplitter_properties": {
+        "train_csv_file": null,
+        "val_csv_file": null,
+        "test_csv_file": "datasets/processed/test_ave.csv"
+    },
+    "device": "cpu",
+    "enable_audio": true,
+    "face_detector": "SFDFaceDetection",
+    "height": 500,
+    "inference_properties": {
+        "show_det_saliency_map": true,
+        "enable_transform_overlays": false,
+        "color_map": "bone"
+    },
+    "max_w_size": 16,
+    "metrics": "SaliencyPredictionMetrics",
+    "metrics_list": [
+        "aucj",
+        "aucs",
+        "cc",
+        "nss",
+        "sim"
+    ],
+    "metrics_mappings": {
+        "gt_salmap": "transformed_salmap",
+        "gt_fixmap": "transformed_fixmap",
+        "pred_salmap": "det_transformed_gazenet",
+        "gt_baseline": "datasets/processed/center_bias_bw.jpg",
+        "scores_info": [
+            "gate_scores"
+        ]
+    },
+    "metrics_save_file": "logs/metrics/defaultgazenet.csv",
+    "model_groups": [
+        [
+            [
+                "GASPInference",
+                -1,
+                -1,
+                {},
+                {
+                    "inp_img_names_list": null
+                },
+                {
+                    "keep_properties": false,
+                    "keep_audio": false,
+                    "keep_plot_frames_only": true,
+                    "resize_frames": true,
+                    "plot_override": [
+                        [
+                            "captured",
+                            "transformed_salmap",
+                            "transformed_fixmap",
+                            "det_transformed_gazenet"
+                        ]
+                    ]
+                }
+            ]
+        ]
+    ],
+    "n_jobs": [
+        3
+    ],
+    "play_audio": false,
+    "postproc_properties": {
+        "keep_properties": false,
+        "keep_audio": false,
+        "keep_plot_frames_only": true,
+        "resize_frames": true
+    },
+    "process_dataset_videos_only": true,
+    "reader": "DataSampleReader",
+    "reader_properties": {},
+    "realtime_capture": false,
+    "sampler": "DataSample",
+    "sampler_properties": {},
+    "sampling_properties": {
+        "show_fixation_locations": true,
+        "show_saliency_map": true,
+        "enable_transform_overlays": false,
+        "color_map": "bone",
+        "img_names_list": [
+            "transformed_salmap",
+            "transformed_fixmap"
+        ]
+    },
+    "stride": 1,
+    "visualize_images": false,
+    "width": 500,
+    "write_annotations": false,
+    "write_images": false,
+    "write_videos": false,
+    "config_info": {
+        "summary": "This measures the saliency metrics on GASP. Only dataset samples (Social) are generated. "
+    }
+}

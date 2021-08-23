@@ -1,0 +1,64 @@
+{
+    "checkpoint_model_dir": "gazenet/models/saliency_prediction/gasp/checkpoints/pretrained_sequencegaspdamencgmualstmconv",
+    "experiment_name": "SequenceGASPDAMEncGMUALSTMConv",
+    "inferer_name": "GASPInference",
+    "log_dir": "logs",
+    "logger": "comet",
+    "model_name": "SequenceGASPDAMEncGMUALSTMConv",
+    "model_properties": {
+        "modalities": 5,
+        "batch_size": 4,
+        "sequence_len": 14,
+        "sequence_norm": true
+    },
+    "project_name": "gasp_runs",
+    "test_dataset_properties": {
+        "csv_file": "datasets/processed/test_ave.csv",
+        "video_dir": "datasets/processed/Grouped_frames",
+        "inp_img_names_list": [
+            "captured",
+            "det_transformed_dave",
+            "det_transformed_esr9",
+            "det_transformed_vidgaze",
+            "det_transformed_gaze360"
+        ],
+        "gt_img_names_list": [
+            "transformed_salmap",
+            "transformed_fixmap"
+        ]
+    },
+    "train_dataset_properties": {
+        "csv_file": "datasets/processed/train_ave.csv",
+        "video_dir": "datasets/processed/Grouped_frames",
+        "inp_img_names_list": [
+            "captured",
+            "det_transformed_dave",
+            "det_transformed_esr9",
+            "det_transformed_vidgaze",
+            "det_transformed_gaze360"
+        ],
+        "gt_img_names_list": [
+            "transformed_salmap",
+            "transformed_fixmap"
+        ]
+    },
+    "val_dataset_properties": {
+        "csv_file": "datasets/processed/validation_ave.csv",
+        "video_dir": "datasets/processed/Grouped_frames",
+        "inp_img_names_list": [
+            "captured",
+            "det_transformed_dave",
+            "det_transformed_esr9",
+            "det_transformed_vidgaze",
+            "det_transformed_gaze360"
+        ],
+        "gt_img_names_list": [
+            "transformed_salmap",
+            "transformed_fixmap"
+        ]
+    },
+    "config_info": {
+        "summary": "Sequential GASP: DAM + ARGMU variant. Exp_Variant_[N]{Norm} ->N: Context size; Norm: Enable temporal normalization;",
+        "example": "python3 gazenet/bin/train.py --train_config GASPExp002_SeqDAMGMUALSTM1x1Conv_14Norm --gpus \"0\" --check_val_every_n_epoch 100 --max_epochs 10000 --checkpoint_save_every_n_epoch 100 --checkpoint_save_n_top 3"
+    }
+}
