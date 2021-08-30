@@ -1,6 +1,6 @@
 # GASP: Gated Attention for Saliency Prediction
 
-[\[Project Page: KT\]](http://software.knowledge-technology.info/#gasp) | [\[Abstract\]](https://www.ijcai.org/proceedings/2021/81) | [\[Paper\]](https://www.ijcai.org/proceedings/2021/0081.pdf) | [\[BibTeX\]](https://www.ijcai.org/proceedings/2021/bibtex/81) 
+[\[Project Page: KT\]](http://software.knowledge-technology.info/#gasp) | [\[Abstract\]](https://www.ijcai.org/proceedings/2021/81) | [\[Paper\]](https://www.ijcai.org/proceedings/2021/0081.pdf) | [\[Poster\]](showcase/IJCAI_21_Poster.pdf) | [\[BibTeX\]](https://www.ijcai.org/proceedings/2021/bibtex/81) 
 
 This is the official [GASP](http://software.knowledge-technology.info/#gasp) code for our paper, presented at 
 [IJCAI 2021](https://ijcai-21.org). If you find this work useful, please cite our [paper](https://www2alt.informatik.uni-hamburg.de/wtm/publications/2021/AWW21/index.php):
