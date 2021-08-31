@@ -441,7 +441,6 @@ class GASPBase(pl.LightningModule):
         return infer_config
 
 
-#done
 @ModelRegistrar.register
 class GASPEncGMUALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -477,7 +476,6 @@ class GASPEncGMUALSTMConv(GASPBase):
         return sal, None, lateral
 
 
-#done
 @ModelRegistrar.register
 class GASPEncALSTMGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -513,7 +511,6 @@ class GASPEncALSTMGMUConv(GASPBase):
         return sal, None, lateral  # lateral is non-fusion
 
 
-#done
 @ModelRegistrar.register
 class GASPEncALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -546,7 +543,6 @@ class GASPEncALSTMConv(GASPBase):
         return sal, None, None
 
 
-#done
 @ModelRegistrar.register
 class GASPDAMEncGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -582,7 +578,6 @@ class GASPDAMEncGMUConv(GASPBase):
         sal = self.saliency_out(sal)
         return sal, dam_sal, lateral  # lateral is non-fusion
 
-#done
 @ModelRegistrar.register
 class GASPDAMEncALSTMGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -623,7 +618,6 @@ class GASPDAMEncALSTMGMUConv(GASPBase):
         return sal, dam_sal, lateral  # lateral is non-fusion
 
 
-#done
 @ModelRegistrar.register
 class GASPDAMEncGMUALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -664,7 +658,6 @@ class GASPDAMEncGMUALSTMConv(GASPBase):
         return sal, dam_sal, lateral
 
 
-#done
 @ModelRegistrar.register
 class GASPEncConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -697,7 +690,6 @@ class GASPEncConv(GASPBase):
         return sal, None, None
 
 
-#done
 @ModelRegistrar.register
 class GASPEncAddConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
@@ -769,7 +761,6 @@ class GASPSEEncConv(GASPBase):
         return sal, None, None
 
 
-#done
 @ModelRegistrar.register
 class SequenceGASPEncALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, sequence_len=16, sequence_norm=False, encoder="Conv", **kwargs):
@@ -823,7 +814,6 @@ class SequenceGASPEncALSTMConv(GASPBase):
         return sal, None, None
 
 
-#done
 @ModelRegistrar.register
 class SequenceGASPEncALSTMGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, sequence_len=16, sequence_norm=False, encoder="Conv", **kwargs):
@@ -876,7 +866,6 @@ class SequenceGASPEncALSTMGMUConv(GASPBase):
         return sal, None, lateral  # lateral is non-fusion
 
 
-#done
 @ModelRegistrar.register
 class SequenceGASPEncGMUALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, sequence_len=16, sequence_norm=False, encoder="Conv", **kwargs):
@@ -923,8 +912,7 @@ class SequenceGASPEncGMUALSTMConv(GASPBase):
         sal = self.saliency_out(sal)
         return sal, None, lateral  # lateral is only the last
 
-
-#done (not tested)
+    
 @ModelRegistrar.register
 class SequenceGASPDAMEncGMUALSTMConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, sequence_len=16, sequence_norm=False, encoder="Conv", **kwargs):
@@ -970,7 +958,6 @@ class SequenceGASPDAMEncGMUALSTMConv(GASPBase):
         return sal, dam_sals, lateral  # lateral is only the last
 
 
-#done (not tested)
 @ModelRegistrar.register
 class SequenceGASPDAMEncALSTMGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, sequence_len=16, sequence_norm=False, encoder="Conv", **kwargs):
@@ -1015,8 +1002,7 @@ class SequenceGASPDAMEncALSTMGMUConv(GASPBase):
         sal = self.saliency_out(sal)
         return sal, dam_sals, lateral  # lateral is non-fusion
 
-
-#done
+    
 @ModelRegistrar.register
 class GASPEncGMUConv(GASPBase):
     def __init__(self, *args, in_channels=3, modalities=4, out_channels=1, encoder="Conv", **kwargs):
