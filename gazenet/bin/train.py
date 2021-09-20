@@ -87,7 +87,7 @@ def train(args, config, infer_configs=None):
         mode='min')
 
     # train
-    trainer = pl.Trainer.from_argparse_args(args, checkpoint_callback=checkpoint_callback, logger=logger)
+    trainer = pl.Trainer.from_argparse_args(args, checkpoint_callback=True, callbacks=[checkpoint_callback], logger=logger)
     config.model_properties.update(train_dataset_properties=config.train_dataset_properties,
                                    val_dataset_properties=config.val_dataset_properties,
                                    test_dataset_properties=config.test_dataset_properties)
