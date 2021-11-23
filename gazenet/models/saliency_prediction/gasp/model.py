@@ -198,6 +198,8 @@ class GASPBase(pl.LightningModule):
             self.log_val_images(x, logits, y)
         losses = self.loss(sal_logits, y)
         logs = {f'val_{k}': (v * self.loss_weights_named[k])/self.batch_size for k, v in losses.items()}
+        for log_key,log_val in logs.items():
+            self.log(log_key, log_val)
         return logs
 
     # TODO (fabawi): if the training is too slow and you don't care about logs, remove this
