@@ -30,13 +30,13 @@
     "metrics_mappings": {
         "gt_salmap": "transformed_salmap",
         "gt_fixmap": "transformed_fixmap",
-        "pred_salmap": "det_transformed_gazenet",
+        "pred_salmap": "det_transformed_gasp",
         "gt_baseline": "datasets/processed/center_bias_bw.jpg",
         "scores_info": [
             "gate_scores"
         ]
     },
-    "metrics_save_file": "logs/metrics/defaultgazenet.csv",
+    "metrics_save_file": "logs/metrics/defaultgasp.csv",
     "model_groups": [
         [
             [
@@ -57,7 +57,7 @@
                             "captured",
                             "transformed_salmap",
                             "transformed_fixmap",
-                            "det_transformed_gazenet"
+                            "det_transformed_gasp"
                         ]
                     ]
                 }
