@@ -176,7 +176,7 @@ class InferMetricsGASP(InferGeneratorAllModelsBase):
           {"inp_img_names_list": ["captured", "det_transformed_dave", "det_transformed_esr9",
                                   "det_transformed_vidgaze", "det_transformed_gaze360"]},
           dict(postproc_properties, **{
-              "plot_override": [["captured", "transformed_salmap", "transformed_fixmap", "det_transformed_gazenet"]]})]]
+              "plot_override": [["captured", "transformed_salmap", "transformed_fixmap", "det_transformed_gasp"]]})]]
     ]
 
     inference_properties = {"show_det_saliency_map": True, "enable_transform_overlays": False, "color_map": "bone"}
@@ -184,7 +184,7 @@ class InferMetricsGASP(InferGeneratorAllModelsBase):
     compute_metrics = True
     metrics_mappings = {"gt_salmap": "transformed_salmap",
                         "gt_fixmap": "transformed_fixmap",
-                        "pred_salmap": "det_transformed_gazenet",
+                        "pred_salmap": "det_transformed_gasp",
                         "gt_baseline": "datasets/processed/center_bias_bw.jpg",  # "gt_baseline": "transformed_fixmap"
                         "scores_info": ["gate_scores"]}
     metrics_save_file = "logs/metrics/defaultgazenet.csv"
@@ -210,7 +210,7 @@ class InferMetricsGASPTrain(InferMetricsGASP):
     model_groups = [
         [["GASPInference", -1, -1, {}, {"inp_img_names_list": None},
           dict(postproc_properties, **{
-              "plot_override": [["captured", "transformed_salmap", "transformed_fixmap", "det_transformed_gazenet"]]})]]
+              "plot_override": [["captured", "transformed_salmap", "transformed_fixmap", "det_transformed_gasp"]]})]]
     ]
 
 
