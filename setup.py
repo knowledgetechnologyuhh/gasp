@@ -15,7 +15,7 @@ setup(
     install_requires=['cython==0.29.1',
                       'pandas==1.0.3',
                       # 'opencv-python==4.2.0.34',
-                      'scikit-build==0.12.0'
+                      'scikit-build==0.12.0',
                       'opencv-contrib-python==4.2.0.34',
                       'matplotlib==3.2.1',
                       'torch==1.7.1',
