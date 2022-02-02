@@ -5,4 +5,3 @@ global-include *.sh
 exclude *.zip *.7z *.tar.gz *.ptb *.ptb.tar *.npy *.npz *.hd5 *.txt *.jpg *.png *.avi *.gif *.mp4 *.wav *.mp3
 include datasets/processed/center_bias.jpg
 include datasets/processed/center_bias_bw.jpg
-global-include *megadown
