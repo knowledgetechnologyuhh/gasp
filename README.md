@@ -27,6 +27,9 @@ This is the official [GASP](http://software.knowledge-technology.info/#gasp) cod
 
 ## Environment Variables and Preparation
 
+Code was tested with **Python 3.8.12** and **Pytorch 1.7.1** on an **Ubuntu 20.04** OS. 
+Recommended: >=16GB RAM, >4GB vRAM for testing and >8GB for training. Trained on an Nvidia GeForce 2080 Ti.
+
 Configuring the training and inference pipelines is done through python scripts to maintain flexibility 
 in adding functionality within the configuration itself. Configuration can also be added externally in the
 form of `json` files found in [infer_configs](gazenet/configs/infer_configs) and [train_configs](gazenet/configs/train_configs). 
