@@ -117,6 +117,7 @@ Note that this might take upwards of a day depending on your CPU and/or GPU.
 2. On download completion, the dataset can be generated (run from within the `--working_dir $GASP_CWD` specified in the previous step):
 
     ```
+    cd $GASP_CWD
     gasp_infer --infer_config InferGeneratorAllModelsCoutrot1
     gasp_infer --infer_config InferGeneratorAllModelsCoutrot2
     gasp_infer --infer_config InferGeneratorAllModelsDIEM
@@ -130,6 +131,12 @@ Note that this might take upwards of a day depending on your CPU and/or GPU.
     ```
    
 ## Training
+
+Navigate to the GASP working directory:
+
+```
+cd $GASP_CWD
+```
 
 To train the best achieving sequential model **(DAM + LARGMU; Context Size = 10)**, invoke the script configuration on the social event subset of the [AVE dataset \[Tavakoli et al.\]](https://hrtavakoli.github.io/AVE/):
 
@@ -167,6 +174,13 @@ The inferer can run and visualize all integrated models as well as the GASP vari
 ```
 gasp_download_manager --working_dir $GASP_CWD \
                       --models "saliency_prediction/gasp/<...>"
+```
+
+
+Navigate to the GASP working directory:
+
+```
+cd $GASP_CWD
 ```
 
 To run the GASP inference, select a configuration class or json file and execute the inference script:
