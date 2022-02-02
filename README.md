@@ -71,6 +71,12 @@ GASP is implemented in Pytorch and trained using the PytorchLightning library. T
 python3 setup.py install
 ` 
 
+*Note*: Make sure all executable file permissions are set correctly:
+
+`
+find ./ -type f -iname "*.sh" -exec chmod +x {} \;
+`
+
 ### Preprocessing and Generating Social Cues + Saliency Prediction Representations (SCD) 
 
 | <span style="display: inline-block; width:500px"> Saliency Prediction (DAVE) + Video </span> | Gaze Direction Estimation (Gaze360) | Gaze Following (VideoGaze) | Facial Expression Recognition (ESR9) |
