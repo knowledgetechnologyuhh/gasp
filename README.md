@@ -183,7 +183,7 @@ Navigate to the GASP working directory:
 cd $GASP_CWD
 ```
 
-To run the GASP inference, select a configuration class or json file and execute the inference script:
+To run the GASP inference, make sure you have downloaded the preprocessed datasets or have processed the SCD images locally. Select a configuration class or json file and execute the inference script:
 
 ```
 gasp_infer --infer_config InferVisualizeGASPSeqDAMALSTMGMU1x1Conv_10Norm --gpu 0
