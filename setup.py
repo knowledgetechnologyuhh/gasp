@@ -31,7 +31,7 @@ setup(
                       'h5py==2.10.0',
                       'scipy==1.4.1',
                       'pillow==8.3.2',
-                      'urllib3==1.25.9',
+                      'urllib3==1.26.11',
                       'numba==0.49.1',
                       'scikit-image==0.17.2',
                       'scikit-learn==0.22.2.post1',
