@@ -121,9 +121,9 @@ Note that this might take upwards of a day depending on your CPU and/or GPU.
 
     ```
     cd $GASP_CWD
-    gasp_infer --infer_config InferGeneratorAllModelsCoutrot1
-    gasp_infer --infer_config InferGeneratorAllModelsCoutrot2
-    gasp_infer --infer_config InferGeneratorAllModelsDIEM
+    gasp_infer --infer_config InferGeneratorAllModelsCoutrot1 --gpu 0
+    gasp_infer --infer_config InferGeneratorAllModelsCoutrot2 --gpu 0
+    gasp_infer --infer_config InferGeneratorAllModelsDIEM --gpu 0
     ```
    
 3. Finally, you could choose to replace the ground-truth fixation density maps and fixation points by the preprocessed 
