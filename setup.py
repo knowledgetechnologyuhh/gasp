@@ -27,7 +27,7 @@ setup(
                       'torchvision==0.8.2',
                       'pytorch-lightning==1.3.3',
                       'tensorboard==2.2.0',
-                      'numpy==1.18.3',
+                      'numpy==1.19.2',
                       'h5py==2.10.0',
                       'scipy==1.4.1',
                       'pillow==8.3.2',
