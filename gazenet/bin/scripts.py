@@ -1,6 +1,5 @@
 import argparse
 import subprocess
-import inspect
 import json
 from shutil import copyfile, rmtree
 import os
@@ -9,12 +8,14 @@ from PIL import Image
 import scipy.io as sio
 import numpy as np
 
+from gazenet.utils.helpers import config_class_to_dict
 from gazenet.utils.registrar import *
+
 
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--working_dir", default="./", type=str,
+    parser.add_argument("--working_dir", default="./", type=str, required=False,
                         help="The working directory in which the directory structure is "
                              "built and downloaded files are stored.")
 
@@ -54,17 +55,7 @@ def generate_config_files(dst_dir):
     TrainingConfigRegistrar.scan()
 
     for config_name, config in TrainingConfigRegistrar.registry.items():
-        if inspect.isclass(config):
-            config_dict = {key: value for key, value in zip(dir(config), [getattr(config, k) for k in dir(config)]) if
-                           not key.startswith('__') and not isinstance(value, classmethod) and not inspect.ismethod(
-                               value)}
-            config_dict.update(
-                {key: getattr(config, key)() for key, value in
-                 zip(dir(config), [getattr(config, k) for k in dir(config)])
-                 if
-                 not key.startswith('__') and (isinstance(value, classmethod) or inspect.ismethod(value))})
-        elif isinstance(config, dict):
-            config_dict = config
+        config_dict = config_class_to_dict(config)
 
         with open(os.path.join(dst_dir, "gazenet", "configs", "train_configs", config_name + ".json"), 'w') as fp:
             json.dump(config_dict, fp, indent=4)
@@ -75,21 +66,13 @@ def generate_config_files(dst_dir):
     InferenceConfigRegistrar.scan()
 
     for config_name, config in InferenceConfigRegistrar.registry.items():
-        if inspect.isclass(config):
-            config_dict = {key: value for key, value in zip(dir(config), [getattr(config, k) for k in dir(config)]) if
-                           not key.startswith('__') and not isinstance(value, classmethod) and not inspect.ismethod(
-                               value)}
-            config_dict.update({key: getattr(config, key)() for key, value in
-                                zip(dir(config), [getattr(config, k) for k in dir(config)]) if
-                                not key.startswith('__') and (
-                                            isinstance(value, classmethod) or inspect.ismethod(value))})
-        elif isinstance(config, dict):
-            config_dict = config
+        config_dict = config_class_to_dict(config)
 
         with open(os.path.join(dst_dir, "gazenet", "configs", "infer_configs", config_name + ".json"), 'w') as fp:
             json.dump(config_dict, fp, indent=4)
 
     print("Generated infer configs to %", os.path.join(dst_dir, "gazenet", "configs", "infer_configs"))
+
 
 def clean_temp(dst_dir):
     rmtree(os.path.join(dst_dir, "temp"))

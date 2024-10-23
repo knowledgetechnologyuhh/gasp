@@ -1,3 +1,8 @@
+"""
+Code from: https://github.com/samyak0210/ViNet/blob/master/model.py
+
+Adapted by Fares Abawi (fares.abawi@uni-hamburg.de)
+"""
 import os
 from collections import OrderedDict
 
@@ -42,7 +47,13 @@ class VideoSaliencyModel(nn.Module):
             # self.decoder = DecoderConvT()
             pass
 
-    def forward(self, x):
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file))
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device)))
+
+    def forward(self, x, *args):
         [y0, y1, y2, y3] = self.backbone(x)
         if self.num_hier == 0:
             return self.decoder(y0)
@@ -95,6 +106,12 @@ class VideoAudioSaliencyFusionModel(nn.Module):
 
         self.maxpool = nn.MaxPool3d((4, 1, 1), stride=(2, 1, 2), padding=(0, 0, 0))
         self.bilinear = nn.Bilinear(42, 3, 4 * 7 * 12)
+
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file))
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device)))
 
     def forward(self, x, audio):
         audio = self.audionet(audio)
@@ -174,6 +191,12 @@ class VideoAudioSaliencyModel(nn.Module):
 
         self.maxpool = nn.MaxPool3d((4, 1, 1), stride=(2, 1, 2), padding=(0, 0, 0))
         self.bilinear = nn.Bilinear(42, 3, 4 * 7 * 12)
+
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file))
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device)))
 
     def forward(self, x, audio):
         audio = self.audionet(audio)

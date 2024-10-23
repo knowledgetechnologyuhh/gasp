@@ -49,26 +49,12 @@ class DAVEInference(InferenceSampleProcessor):
 
         # load the model
         self.model = DAVE(frames_len=frames_len)
-        self.model.load_state_dict(self._load_state_dict_(weights_file, device), strict=True)
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        self.model.load_model(weights_file=weights_file, device=device)
         print("DAVE model loaded from", weights_file)
         self.model = self.model.to(device)
         self.model.eval()
-
-    @staticmethod
-    def _load_state_dict_(filepath, device):
-        if os.path.isfile(filepath):
-            # print("=> loading checkpoint '{}'".format(filepath))
-            checkpoint = torch.load(filepath, map_location=torch.device(device))
-
-            pattern = re.compile(r'module+\.*')
-            state_dict = checkpoint['state_dict']
-            for key in list(state_dict.keys()):
-                res = pattern.match(key)
-                if res:
-                    new_key = re.sub('module.', '', key)
-                    state_dict[new_key] = state_dict[key]
-                    del state_dict[key]
-            return state_dict
 
     def infer_frame(self, grabbed_video_list, grouped_video_frames_list, grabbed_audio_list, audio_frames_list, info_list, properties_list,
                     video_frames_list, audio_features=None, valid_audio_frames_len=None, source_frames_idxs=None, **kwargs):

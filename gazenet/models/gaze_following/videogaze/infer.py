@@ -1,7 +1,7 @@
 import os
 from itertools import zip_longest
 
-import cv2
+import cv2  # TODO (fabawi): here we shouldn't import cv2. The generator should deal with the processing in cv2
 import numpy as np
 import torch
 import torch.nn.parallel
@@ -42,8 +42,9 @@ class VideoGazeInference(InferenceSampleProcessor):
         
         # load the model
         self.model = VideoGaze(batch_size=batch_size, side=trg_img_side)
-        checkpoint = torch.load(weights_file)
-        self.model.load_state_dict(checkpoint['state_dict'])
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        self.model.load_model(weights_file=weights_file)
         print("VideoGaze model loaded from", weights_file)
         self.model.to(device)
         cudnn.benchmark = True

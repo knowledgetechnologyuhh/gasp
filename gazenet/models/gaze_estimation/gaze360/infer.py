@@ -10,7 +10,7 @@ import torchvision.transforms as transforms
 
 from gazenet.utils.registrar import *
 from gazenet.models.gaze_estimation.gaze360.generator import spherical_to_cartesian, spherical_to_compatible_form, pre_process_input_image
-from gazenet.models.gaze_estimation.gaze360.model import GazeLSTM
+from gazenet.models.gaze_estimation.gaze360.model import GazeLSTM, DataParallel
 from gazenet.utils.sample_processors import InferenceSampleProcessor
 from gazenet.utils.helpers import spherical_to_euler
 
@@ -29,8 +29,9 @@ class Gaze360Inference(InferenceSampleProcessor):
                  inp_img_height=INP_IMG_HEIGHT, inp_img_mean=INP_IMG_MEAN, inp_img_std=INP_IMG_STD,
                  device="cuda:0", width=None, height=None, **kwargs):
         super().__init__(width=width, height=height, **kwargs)
+
         self.short_name = "gaze360"
-        # the original implementation skips an 8th of a frame when scanning surrounig frames
+        # the original implementation skips an 8th of a frame when scanning surrounding frames
         # self.w_fps_div = max(int(w_fps // 8), 1)
         # we skip one frame at a time
         self.w_fps_div = 1
@@ -45,10 +46,10 @@ class Gaze360Inference(InferenceSampleProcessor):
 
         # load the model
         self.model = GazeLSTM()
-        model = torch.nn.DataParallel(self.model).to(device)
-        model.to(device)
-        checkpoint = torch.load(weights_file)
-        model.load_state_dict(checkpoint['state_dict'])
+        model = DataParallel(self.model).to(device)
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        model.load_model(weights_file=weights_file)
         print("Gaze360 model loaded from", weights_file)
         model.eval()
 
@@ -74,12 +75,18 @@ class Gaze360Inference(InferenceSampleProcessor):
 
                 count = 0
                 for j in range(frame_id - 3 * self.w_fps_div, frame_id + 4 * self.w_fps_div, self.w_fps_div):
-                    if j < 0 or j >= len(faces_locations) or not faces_locations[j]:
+                    if (j < 0 or j >= len(faces_locations)) and video_frames_list[frame_id] is not None:
                         face_img = video_frames_list[frame_id].copy()
                     else:
-                        if id < len(faces_locations[j]):
+                        # TODO (fabawi): this approach will not work if we intend on supporting visual object tracking
+                        if id < len(faces_locations[j]) and faces_locations[j] is not None and video_frames_list[j] is not None:
                             face_img = video_frames_list[j].copy()
                             face_local = faces_locations[j][id]
+                        elif faces_locations[j] is None:
+                            face_local = False
+                            continue
+                        elif video_frames_list[frame_id] is None:
+                           continue
                         else:
                             face_img = video_frames_list[frame_id].copy()
 

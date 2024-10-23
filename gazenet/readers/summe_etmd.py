@@ -49,8 +49,8 @@ class SumMeETMDSampleReader(SampleReader):
 
         for video_name in tqdm(sorted(os.listdir(self.video_dir)), desc="Samples Read"):
             if video_name.endswith("." + self.video_format):
-                id = video_name.replace("." + self.video_format, "")
-                audio_full_name = os.path.join(self.audio_dir, id + "." + self.audio_format)
+                sample_id = video_name.replace("." + self.video_format, "")
+                audio_full_name = os.path.join(self.audio_dir, sample_id + "." + self.audio_format)
                 if os.path.isfile(audio_full_name):
                     has_audio = True
                 else:
@@ -58,14 +58,14 @@ class SumMeETMDSampleReader(SampleReader):
                     has_audio = check_audio_in_video(os.path.join(self.video_dir, video_name))
                 try:
                     # annotation assembly
-                    annotation = annotations['eye_data_all'][id][0][0]
+                    annotation = annotations['eye_data_all'][sample_id][0][0]
 
                     video_width_height = extract_width_height_from_video(os.path.join(self.video_dir, video_name))
 
                     annotation[0, :, :] *= video_width_height[0]
                     annotation[1, :, :] *= video_width_height[1]
                     annotation = annotation.astype(np.uint32)
-                    self.samples.append({"id": id,
+                    self.samples.append({"id": sample_id,
                                          "audio_name": audio_full_name,
                                          "video_name": os.path.join(self.video_dir, video_name),
                                          "video_width": video_width_height[0],
@@ -74,13 +74,13 @@ class SumMeETMDSampleReader(SampleReader):
                                              os.path.join(self.video_dir, video_name)) if self.extract_thumbnails else None,
                                          "len_frames": len(annotation[0]),
                                          "has_audio": has_audio,
-                                         "annotation_name": id,
+                                         "annotation_name": sample_id,
                                          "annotations": {"xyp": annotation}
                                          })
-                    self.video_id_to_sample_idx[id] = len(self.samples) - 1
+                    self.video_id_to_sample_idx[sample_id] = len(self.samples) - 1
                     self.len_frames += self.samples[-1]["len_frames"]
                 except:
-                    print("Error: Access non-existent annotation " + id)
+                    print("Error: Access non-existent annotation " + sample_id)
 
     @staticmethod
     def dataset_info():

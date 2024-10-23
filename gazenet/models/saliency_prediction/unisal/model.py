@@ -274,6 +274,12 @@ class UNISAL(BaseModel):
         if self.verbose > 1:
             pprint.pprint(self.asdict(), width=1)
 
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file))
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device)))
+
     @property
     def this_source(self):
         """Return current source for domain-specific BatchNorm."""

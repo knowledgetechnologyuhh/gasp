@@ -67,6 +67,11 @@ class OpenCV(object):
         frame = cv2.resize(frame, (width, height), interpolation)
         return frame
 
+    def flip_horizontal(self, frame):
+        frame = frame.copy()
+        frame = cv2.flip(frame, 1)
+        return frame
+
     def plot_color_map(self, np_frame, color_map=None):
         _, color = self.__prep_map_image__(None, color_map)
         frame = cv2.applyColorMap(np_frame, colormap=color)
@@ -113,7 +118,6 @@ class OpenCV(object):
         y1 = size * (np.cos(pitch) * np.sin(roll) + np.cos(roll) * np.sin(pitch) * np.sin(yaw)) + tdy
 
         # Y-Axis | drawn in green
-        #        v
         x2 = size * (-np.cos(yaw) * np.sin(roll)) + tdx
         y2 = size * (np.cos(pitch) * np.cos(roll) - np.sin(pitch) * np.sin(yaw) * np.sin(roll)) + tdy
 

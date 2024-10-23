@@ -1,4 +1,3 @@
-
 import re
 import os
 
@@ -51,29 +50,15 @@ class STAViSInference(InferenceSampleProcessor):
         super().__init__(width=width, height=height, w_size=w_size, **kwargs)
 
         # load the model
-        self.model = stavis_model.resnet50(shortcut_type="B", sample_size=inp_img_width, sample_duration=frames_len, audiovisual=audiovisual)
-        self.model.load_state_dict(self._load_state_dict_(weights_file, device), strict=False)
+        self.model = stavis_model.resnet50(shortcut_type="B", sample_size=inp_img_width, sample_duration=frames_len,
+                                           audiovisual=audiovisual)
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        self.model.load_model(weights_file=weights_file, device=device)
         print("STAViS model loaded from", weights_file)
         self.model = self.model.to(device)
         # cudnn.benchmarks = True
-        # TODO (fabawi): restore eval for proper batch normalization adjustment
         # self.model.eval()
-
-    @staticmethod
-    def _load_state_dict_(filepath, device):
-        if os.path.isfile(filepath):
-            # print("=> loading checkpoint '{}'".format(filepath))
-            checkpoint = torch.load(filepath, map_location=torch.device(device))
-
-            pattern = re.compile(r'module+\.*')
-            state_dict = checkpoint['state_dict']
-            for key in list(state_dict.keys()):
-                res = pattern.match(key)
-                if res:
-                    new_key = re.sub('module.', '', key)
-                    state_dict[new_key] = state_dict[key]
-                    del state_dict[key]
-            return state_dict
 
     def infer_frame(self, grabbed_video_list, grouped_video_frames_list, grabbed_audio_list, audio_frames_list, info_list, properties_list,
                     video_frames_list, hann_audio_frames, valid_audio_frames_len=None, source_frames_idxs=None, **kwargs):

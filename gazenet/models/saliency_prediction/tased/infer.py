@@ -38,29 +38,13 @@ class TASEDInference(InferenceSampleProcessor):
 
         # load the model
         self.model = TASED_v2()
-        self.model = self._load_model_(weights_file, self.model)
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        self.model.load_model(weights_file=weights_file)
         print("TASED model loaded from", weights_file)
         self.model = self.model.to(device)
         cudnn.benchmark = False
         self.model.eval()
-
-    @staticmethod
-    def _load_model_(filepath, model):
-        if os.path.isfile(filepath):
-            weight_dict = torch.load(filepath)
-            model_dict = model.state_dict()
-            for name, param in weight_dict.items():
-                if 'module' in name:
-                    name = '.'.join(name.split('.')[1:])
-                if name in model_dict:
-                    if param.size() == model_dict[name].size():
-                        model_dict[name].copy_(param)
-                    else:
-                        print(' size? ' + name, param.size(), model_dict[name].size())
-                else:
-                    print(' name? ' + name)
-
-            return model
 
     def infer_frame(self, grabbed_video_list, grouped_video_frames_list, grabbed_audio_list, audio_frames_list, info_list, properties_list,
                     video_frames_list, source_frames_idxs=None, **kwargs):

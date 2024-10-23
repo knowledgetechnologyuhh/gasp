@@ -1,3 +1,5 @@
+import os
+import re
 from functools import partial
 
 import torch
@@ -23,13 +25,32 @@ class AVModule(nn.Module):
         self.out_layers = 64
         self.img_size = img_size
         self.avgpool_rgb = nn.AvgPool3d((temp_size, 1, 1), stride=1)
-        # Make the layers numbers equal
+        # make the layers numbers equal
         self.relu = nn.ReLU()
         self.affine_rgb = nn.Linear(rgb_nfilters, hidden_layers)
         self.affine_audio = nn.Linear(audio_nfilters, hidden_layers)
         self.w_a_rgb = nn.Bilinear(hidden_layers, hidden_layers, self.out_layers, bias=True)
         self.upscale_ = nn.Upsample(scale_factor=8, mode='bilinear')
 
+    def load_model(self, weights_file, device=None):
+        self.load_state_dict(self._load_state_dict_(weights_file, device), strict=False)
+
+    @staticmethod
+    def _load_state_dict_(weights_file, device=None):
+        if os.path.isfile(weights_file):
+            if device is None:
+                checkpoint = torch.load(weights_file)
+            else:
+                checkpoint = torch.load(weights_file, map_location=torch.device(device))
+            pattern = re.compile(r'module+\.*')
+            state_dict = checkpoint['state_dict']
+            for key in list(state_dict.keys()):
+                res = pattern.match(key)
+                if res:
+                    new_key = re.sub('module.', '', key)
+                    state_dict[new_key] = state_dict[key]
+                    del state_dict[key]
+            return state_dict
 
     def forward(self, rgb, audio, crop_h, crop_w):
 
@@ -229,10 +250,10 @@ class ResNet(nn.Module):
                         bias=False), nn.BatchNorm3d(planes * block.expansion, momentum=0.1 if TRAINING else 0.0))
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample, training=TRAINING))
+        layers.append(block(self.inplanes, planes, stride, downsample, momentum=0.1 if TRAINING else 0.0))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, training=TRAINING))
+            layers.append(block(self.inplanes, planes, momentum=0.1 if TRAINING else 0.0))
 
         return nn.Sequential(*layers)
 

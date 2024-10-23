@@ -1,4 +1,0 @@
-dash==1.11.0
-dash-bootstrap-components
-ffpyplayer
-# -e git+https://github.com/pytorch/accimage.git#egg=accimage

@@ -53,7 +53,7 @@ def downsample_basic_block(x, planes, stride):
                              out.size(2), out.size(3),
                              out.size(4)).zero_()
     if isinstance(out.data, torch.cuda.FloatTensor):
-        zero_pads = zero_pads.cuda()
+        zero_pads = zero_pads.to(out.device)
 
     out = Variable(torch.cat([out.data, zero_pads], dim=1))
 
@@ -63,13 +63,13 @@ def downsample_basic_block(x, planes, stride):
 class BasicBlock(nn.Module):
     expansion = 1
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, training=True):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, momentum=0.1):
         super(BasicBlock, self).__init__()
         self.conv1 = conv3x3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm3d(planes, momentum=0.1 if training else 0.0)
+        self.bn1 = nn.BatchNorm3d(planes, momentum=momentum)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3x3(planes, planes)
-        self.bn2 = nn.BatchNorm3d(planes, momentum=0.1 if training else 0.0)
+        self.bn2 = nn.BatchNorm3d(planes, momentum=momentum)
         self.downsample = downsample
         self.stride = stride
 
@@ -95,15 +95,15 @@ class BasicBlock(nn.Module):
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, training=True):
+    def __init__(self, inplanes, planes, stride=1, downsample=None, momentum=0.1):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv3d(inplanes, planes, kernel_size=1, bias=False)
-        self.bn1 = nn.BatchNorm3d(planes, momentum=0.1 if training else 0.0)
+        self.bn1 = nn.BatchNorm3d(planes, momentum=momentum)
         self.conv2 = nn.Conv3d(planes, planes, kernel_size=3, stride=stride,
                                padding=1, bias=False)
-        self.bn2 = nn.BatchNorm3d(planes, momentum=0.1 if training else 0.0)
+        self.bn2 = nn.BatchNorm3d(planes, momentum=momentum)
         self.conv3 = nn.Conv3d(planes, planes * 4, kernel_size=1, bias=False)
-        self.bn3 = nn.BatchNorm3d(planes * 4, momentum=0.1 if training else 0.0)
+        self.bn3 = nn.BatchNorm3d(planes * 4, momentum=momentum)
         self.relu = nn.ReLU(inplace=True)
         self.downsample = downsample
         self.stride = stride
@@ -133,15 +133,17 @@ class Bottleneck(nn.Module):
 
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, sample_size, sample_duration, shortcut_type='B', num_classes=400, last_fc=True, last_pool=True):
+    def __init__(self, block, layers, sample_size, sample_duration, shortcut_type='B', num_classes=400,
+                 last_fc=True, last_pool=True, momentum=0.1):
         self.last_fc = last_fc
         self.last_pool = last_pool
+        self.momentum = momentum
 
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv3d(3, 64, kernel_size=7, stride=(1, 2, 2),
                                padding=(3, 3, 3), bias=False)
-        self.bn1 = nn.BatchNorm3d(64)
+        self.bn1 = nn.BatchNorm3d(64, momentum=momentum)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool3d(kernel_size=(3, 3, 3), stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0], shortcut_type)
@@ -172,14 +174,14 @@ class ResNet(nn.Module):
                 downsample = nn.Sequential(
                     nn.Conv3d(self.inplanes, planes * block.expansion,
                               kernel_size=1, stride=stride, bias=False),
-                    nn.BatchNorm3d(planes * block.expansion)
+                    nn.BatchNorm3d(planes * block.expansion, momentum=self.momentum)
                 )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample))
+        layers.append(block(self.inplanes, planes, stride, downsample, momentum=self.momentum))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))
+            layers.append(block(self.inplanes, planes, momentum=self.momentum))
 
         return nn.Sequential(*layers)
 

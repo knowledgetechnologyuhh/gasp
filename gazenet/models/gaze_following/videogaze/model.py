@@ -265,6 +265,12 @@ class VideoGaze(nn.Module):
         self.last_convolution = nn.Conv2d(1, 1, kernel_size=1, stride=1)
         self.side = side
 
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file)['state_dict'])
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device))['state_dict'])
+
     def forward(self, source,target,face,eyes):
         saliency_256 = self.saliency_pathway(target)
         saliency_output = self.last_conv(saliency_256)

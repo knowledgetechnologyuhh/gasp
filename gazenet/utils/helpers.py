@@ -1,8 +1,27 @@
 ################################################  Formatting  ##########################################################
 
+class UnNormalize(object):
+    def __init__(self, mean, std):
+        self.mean = mean
+        self.std = std
+
+    def __call__(self, tensor):
+        """
+        Args:
+            tensor (Tensor): Tensor image of size (C, H, W) to be normalized.
+        Returns:
+            Tensor: Normalized image.
+        """
+        for t, m, s in zip(tensor, self.mean, self.std):
+            t.mul_(s).add_(m)
+            # The normalize code -> t.sub_(m).div_(s)
+        return tensor
+
+
 # based on: https://stackoverflow.com/a/62001539
-def flatten_dict(input_node: dict, key_: str = '', output_dict: dict = {}):
-    if isinstance(input_node, dict):
+def flatten_dict(input_node, key_="", output_dict={}):
+    import collections.abc
+    if isinstance(input_node, collections.abc.Mapping):
         for key, val in input_node.items():
             new_key = f"{key_}.{key}" if key_ else f"{key}"
             flatten_dict(val, new_key, output_dict)
@@ -12,6 +31,85 @@ def flatten_dict(input_node: dict, key_: str = '', output_dict: dict = {}):
     else:
         output_dict[key_] = input_node
     return output_dict
+
+
+def config_class_to_dict(config):
+    import collections.abc
+    import inspect
+    if inspect.isclass(config):
+        config_dict = {key: value for key, value in zip(dir(config), [getattr(config, k) for k in dir(config)]) if
+                       not key.startswith('__') and not isinstance(value, classmethod) and not inspect.ismethod(
+                           value)}
+        config_dict.update(
+            {key: getattr(config, key)() for key, value in
+             zip(dir(config), [getattr(config, k) for k in dir(config)])
+             if
+             not key.startswith('__') and (isinstance(value, classmethod) or inspect.ismethod(value))})
+
+    elif isinstance(config, collections.abc.Mapping):
+        config_dict = config
+    else:
+        raise TypeError("Configuration must be a dictionary or a class object")
+    config_dict["__name__"] = config.__name__
+    return config_dict
+
+
+def config_dict_to_class(config_dict, config_type, config_name=None):
+    from gazenet.utils.registrar import InferenceConfigRegistrar, TrainingConfigRegistrar
+    if config_type == InferenceConfigRegistrar:
+        if config_name is not None and config_name in config_type.registry.keys():
+            base_name = config_name
+        elif "__name__" in config_dict and config_dict["__name__"] in config_type.registry.keys():
+            base_name = config_dict["__name__"]
+        else:
+            base_name = "InferGeneratorAllModelsBase"
+    elif config_type == TrainingConfigRegistrar:
+        if config_name is not None and config_name in config_type.registry.keys():
+            base_name = config_name
+        elif "__name__" in config_dict and config_dict["__name__"] in config_type.registry.keys():
+            base_name = config_dict["__name__"]
+        else:
+            base_name = "TrainerBase"
+    else:
+        raise TypeError("Unknown configuration type")
+    config = config_type.registry[base_name]
+    if config_name is None:
+        config.__name__ = config_dict["__name__"]
+    else:
+        config.__name__ = config_name
+    for data_key, data_val in config_dict.items():
+        setattr(config, data_key, data_val)
+    return config
+
+
+def replace_config_placeholder_args(config, config_type, placeholder_args):
+    # convert config to config_dict
+    config_dict = config_class_to_dict(config)
+    placeholder_dict = dict(zip(placeholder_args[::2], placeholder_args[1::2]))
+    config_dict = update_nested(config_dict, u=placeholder_dict)
+    config_dict = update_nested(config_dict, evaluate=True)
+    config = config_dict_to_class(config_dict, config_type=config_type)
+    return config
+
+
+def update_nested(d, u=None, evaluate=False):
+    import collections.abc
+    if isinstance(d, collections.abc.Mapping):
+        for k, v in d.items():
+            d[k] = update_nested(d.get(k, {}), u, evaluate=evaluate)
+    elif isinstance(d, list) or isinstance(d, tuple):
+        if isinstance(d, tuple):
+            d = list(d)
+        for k, v in enumerate(d):
+            d[k] = update_nested(d[k], u, evaluate=evaluate)
+    elif isinstance(d, str) and not evaluate:
+        for k_u, v_u in u.items():
+            if k_u and k_u[2:] in d and len(k_u) > 3 and k_u[2] == "@":
+                d = d.replace(k_u[2:], v_u)
+    elif isinstance(d, str):
+        if "eval(" in d:
+            d = eval(d[5:-1])
+    return d
 
 
 def dynamic_module_import(modules, globals):
@@ -100,6 +198,15 @@ def extract_width_height_from_video(filename):
     return int(width), int(height)
 
 
+def extract_len_from_video(filename):
+    import cv2
+    vcap = cv2.VideoCapture(filename)
+    fps = vcap.get(cv2.CAP_PROP_FPS)
+    frames = int(vcap.get(cv2.CAP_PROP_FRAME_COUNT))
+    duration = frames/fps
+    return frames, duration, fps
+
+
 def extract_thumbnail_from_video(filename, thumb_width=180, thumb_height=108, threshold=1):
     import cv2
     vcap = cv2.VideoCapture(filename)
@@ -117,6 +224,11 @@ def extract_width_height_thumbnail_from_image(filename, thumb_width=180, thumb_h
     height, width = im.shape[:2]
     im_ar = cv2.resize(im, (thumb_width, thumb_height), 0, 0, cv2.INTER_LINEAR)
     return int(width), int(height), im_ar
+
+
+def open_image(filename, gray=True):
+    import cv2
+    return cv2.imread(filename, 0 if gray else 1)
 
 
 def encode_image(img, raw=False):
@@ -308,7 +420,7 @@ def mp_multivariate_gaussian(entries, width, height, xy_std=(10, 10)):
     x = np.arange(0, width, 1, float)
     y = np.arange(0, height, 1, float)
     x, y = np.meshgrid(x, y, copy=False, sparse=True)
-    results = Parallel(n_jobs=4, prefer="threads")(delayed(multivariate_gaussian)(x, y, (entries[i, 0], entries[i, 1],),
+    results = Parallel(n_jobs=1, prefer="threads")(delayed(multivariate_gaussian)(x, y, (entries[i, 0], entries[i, 1],),
                                                                                   width, height, xy_std,
                                                                                   amplitude = entries[i, 2])
                                                    for i in range(entries.shape[0]))

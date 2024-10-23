@@ -64,6 +64,10 @@ class MetricsRegistrar(object):
         modules = glob(os.path.join(os.path.dirname(__file__), "..", "models", "**", "metrics.py"), recursive=True)
         modules = ["gazenet.models." + module.replace(os.path.dirname(__file__) + "/../models/", "") for module in modules]
         dynamic_module_import(modules, globals())
+        # add the application metrics as well
+        modules = glob(os.path.join(os.path.dirname(__file__), "..", "applications", "**", "metrics.py"), recursive=True)
+        modules = ["gazenet.applications." + module.replace(os.path.dirname(__file__) + "/../applications/", "") for module in modules]
+        dynamic_module_import(modules, globals())
 
 
 # An InferenceSampleProcessor inheriting class
@@ -79,6 +83,22 @@ class InferenceRegistrar(object):
     def scan():
         modules = glob(os.path.join(os.path.dirname(__file__), "..", "models", "**", "infer.py"), recursive=True)
         modules = ["gazenet.models." + module.replace(os.path.dirname(__file__) + "/../models/", "") for module in modules]
+        dynamic_module_import(modules, globals())
+
+
+# An InferenceSampleProcessor inheriting class (not as strict as InferenceRegistrar requirements though)
+class ApplicationRegistrar(object):
+    registry = {}
+
+    @staticmethod
+    def register(cls):
+        ApplicationRegistrar.registry[cls.__name__] = cls
+        return cls
+
+    @staticmethod
+    def scan():
+        modules = glob(os.path.join(os.path.dirname(__file__), "..", "applications", "**", "application.py"), recursive=True)
+        modules = ["gazenet.applications." + module.replace(os.path.dirname(__file__) + "/../applications/", "") for module in modules]
         dynamic_module_import(modules, globals())
 
 
@@ -98,6 +118,48 @@ class ReaderRegistrar(object):
         dynamic_module_import(modules, globals())
         # add the data reader as well
         modules = glob(os.path.join(os.path.dirname(__file__), "dataset_processors.py"), recursive=False)
+        modules = ["gazenet.utils." + modules[0].replace(os.path.dirname(__file__) + "/", "")]
+        dynamic_module_import(modules, globals())
+
+
+# A video capture registrar
+class VideoCaptureRegistrar(object):
+    registry = {}
+
+    @staticmethod
+    def register(cls):
+        VideoCaptureRegistrar.registry[cls.__name__] = cls
+        return cls
+
+    @staticmethod
+    def scan():
+        # add robot video capturers
+        modules = glob(os.path.join(os.path.dirname(__file__), "..", "robots", "**", "capturer.py"), recursive=True)
+        modules = ["gazenet.robots." + module.replace(os.path.dirname(__file__) + "/../robots/", "") for module in modules]
+        dynamic_module_import(modules, globals())
+        # add the global capturer as well
+        modules = glob(os.path.join(os.path.dirname(__file__), "capturers.py"), recursive=False)
+        modules = ["gazenet.utils." + modules[0].replace(os.path.dirname(__file__) + "/", "")]
+        dynamic_module_import(modules, globals())
+
+
+# A video capture registrar
+class AudioCaptureRegistrar(object):
+    registry = {}
+
+    @staticmethod
+    def register(cls):
+        AudioCaptureRegistrar.registry[cls.__name__] = cls
+        return cls
+
+    @staticmethod
+    def scan():
+        # add robot video capturers
+        modules = glob(os.path.join(os.path.dirname(__file__), "..", "robots", "**", "capturer.py"), recursive=True)
+        modules = ["gazenet.robots." + module.replace(os.path.dirname(__file__) + "/../robots/", "") for module in modules]
+        dynamic_module_import(modules, globals())
+        # add the global capturer as well
+        modules = glob(os.path.join(os.path.dirname(__file__), "capturers.py"), recursive=False)
         modules = ["gazenet.utils." + modules[0].replace(os.path.dirname(__file__) + "/", "")]
         dynamic_module_import(modules, globals())
 

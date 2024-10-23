@@ -47,7 +47,9 @@ class UNISALInference(InferenceSampleProcessor):
 
         # load the model
         self.model = UNISAL()
-        self.model.load_state_dict(torch.load(weights_file, map_location=torch.device(device)))
+        if weights_file in MODEL_PATHS.keys():
+            weights_file = MODEL_PATHS[weights_file]
+        self.model.load_model(weights_file=weights_file, device=device)
         print("UNISAL model loaded from", weights_file)
         self.model = self.model.to(device)
         self.model.eval()

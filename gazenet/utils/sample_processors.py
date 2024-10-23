@@ -1,30 +1,23 @@
 import threading
-import pickle
 import subprocess
 import queue
 import os
 from pathlib import Path
 
 import cv2
-import numpy as np
-import sounddevice as sd
-import librosa
 
+from gazenet.utils.registrar import *
 from gazenet.utils.helpers import stack_images
+from gazenet.utils.constants import *
+
+try:  # pickle with protocol 5 if python<3.8
+    import pickle5 as pickle
+except:
+    import pickle
 
 SERVER_MODE = False
 REVIVE_RETRIES = 5
-
-DEFAULT_SAMPLE_RATE = 16000
-
-# audio capturer property ids
-AUCAP_PROP_SAMPLE_RATE = 1001
-AUCAP_PROP_CHUNK_SIZE = 1002
-AUCAP_PROP_BUFFER_SIZE = 1003
-AUCAP_PROP_CHANNELS = 1004
-AUCAP_PROP_POS_FRAMES = 1005
-AUCAP_PROP_FRAME_COUNT = 1007
-# AUCAP_PROP_POS_MSEC = 1008
+DEFAULT_FPS = 25
 
 
 class SampleReader(object):
@@ -77,171 +70,20 @@ class SampleReader(object):
     def read(self):
         with open(self.pickle_file, "rb") as f:
             data = pickle.load(f)
-            assert data["__name__"] == self.__class__.__name__, \
-                "The pickle_file has a mismatching name. " \
-                "Ensure the correct pickle_file is read"
+            if self.__class__.__name__ != "SampleReader":
+                assert data["__name__"] == self.__class__.__name__, \
+                    "The pickle_file has a mismatching name. " \
+                    "Ensure the correct pickle_file is read"
 
             self.len_frames = data["len_frames"]
             self.samples = data["samples"]
             self.video_id_to_sample_idx = data["video_id_to_sample_idx"]
 
     def read_raw(self):
-        raise NotImplementedError("Not implemented for abstract Reader")
+        raise NotImplementedError("Not implemented for base Reader")
 
     def __len__(self):
         return len(self.samples)
-
-
-class ImageCapture(object):
-    """
-    Loads all the image indices in a directory to the memory. When too many images are in a directory, use cv2.VideoCapture
-    instead, making sure the images follow the string format provided and are ordered sequentially
-    """
-    def __init__(self, directory, extension="jpg", fps=1, sub_directories=False, image_file="captured_1", *args, **kwargs):
-        self.properties = {
-            cv2.CAP_PROP_POS_FRAMES: 0,
-            cv2.CAP_PROP_FPS: fps,
-            cv2.CAP_PROP_FRAME_COUNT: None,
-            cv2.CAP_PROP_FRAME_WIDTH: None,
-            cv2.CAP_PROP_FRAME_HEIGHT: None
-        }
-        self.directory = directory
-        self.sub_directories = True
-
-        if sub_directories:
-            self.frames = [os.path.join(f, image_file+"."+extension) for f in os.listdir(directory)]
-            self.frames = sorted(self.frames, key=lambda x: float(x.split(os.sep, 1)[0]))
-        else:
-            self.frames = [f for f in os.listdir(directory) if f.endswith("."+extension)]
-            self.frames = sorted(self.frames, key=lambda x: float(x[:-(len(extension)+1)]))
-        self.set(cv2.CAP_PROP_FRAME_COUNT, len(self.frames))
-
-        file = os.path.join(self.directory, self.frames[0])
-        im = cv2.imread(file)
-        h, w, c = im.shape
-        self.set(cv2.CAP_PROP_FRAME_WIDTH, w)
-        self.set(cv2.CAP_PROP_FRAME_HEIGHT, h)
-
-        self.opened = True
-
-    def read(self):
-        try:
-            frame_index = self.get(cv2.CAP_PROP_POS_FRAMES)
-            file = os.path.join(self.directory, self.frames[frame_index])
-            im = cv2.imread(file)
-            self.opened = True
-            self.set(cv2.CAP_PROP_POS_FRAMES, frame_index+1)
-            return True, im
-        except:
-            self.opened = False
-            return False, None
-
-    def isOpened(self):
-            return self.opened
-
-    def release(self):
-        self.frames = []
-
-    def set(self, propId, value):
-        self.properties[propId] = value
-
-    def get(self, propId):
-        return self.properties[propId]
-
-
-class AudioCapture(object):
-    """
-    Loads an entire audio file into memory (no buffering due to limited format support) and microphone (blocking)
-    """
-    def __init__(self, source, buffer_size=30, rate=None, channels=1, len_frames=1):
-        self.properties = {
-            AUCAP_PROP_BUFFER_SIZE: buffer_size,
-            AUCAP_PROP_SAMPLE_RATE: rate,
-            AUCAP_PROP_CHANNELS: channels,
-            AUCAP_PROP_CHUNK_SIZE: None,
-            AUCAP_PROP_FRAME_COUNT: len_frames,
-            AUCAP_PROP_POS_FRAMES: 0,
-        }
-
-        # capturing mode
-        if "." in source:  # file
-            self.reader = self.__getfile__
-            self.stream = librosa.load(source, sr=rate, duration=len_frames/buffer_size)
-            self.frame_indices, chunk_size = np.linspace(0, len(self.stream[0]), num=len_frames, retstep=True, endpoint=False, dtype=int)
-            self.set(AUCAP_PROP_CHUNK_SIZE, int(chunk_size))
-            self.set(AUCAP_PROP_SAMPLE_RATE, self.stream[1])
-
-        else:  # microphone
-            # TODO (fabawi): microphone reading is very choppy
-            self.reader = self.__getmic__
-            if len_frames <= 0:
-                len_frames = 1
-            if rate is None:
-                device_info = sd.query_devices(source, 'input')
-                rate = int(device_info['default_samplerate'])
-                self.set(AUCAP_PROP_SAMPLE_RATE, int(rate))
-            chunk_size = int(rate * len_frames / buffer_size)
-            self.stream = sd.InputStream(device=source,
-                                         samplerate=rate,
-                                         channels=channels,
-                                         blocksize=chunk_size*buffer_size)
-            self.stream.start()
-            self.set(AUCAP_PROP_CHUNK_SIZE, chunk_size)
-        self.opened = True
-        self.state = -1
-        self.read_lock = threading.Lock()
-
-    def __getmic__(self):
-        frames = self.stream.read(self.get(AUCAP_PROP_CHUNK_SIZE)*self.get(AUCAP_PROP_BUFFER_SIZE))
-        frames = np.array(np.split(frames[0], self.get(AUCAP_PROP_BUFFER_SIZE)))
-        return frames
-        pass
-
-    def __getfile__(self):
-        curr_frame_idx = self.frame_indices[self.get(AUCAP_PROP_POS_FRAMES)]
-        frames = self.stream[0][curr_frame_idx:
-                              curr_frame_idx + (self.get(AUCAP_PROP_BUFFER_SIZE)*self.get(AUCAP_PROP_CHUNK_SIZE))]
-        frames = np.array(np.split(frames, self.get(AUCAP_PROP_BUFFER_SIZE)))
-        return frames
-
-    def read(self, *args, stateful=False, **kwargs):
-        # TODO (fabawi): being stateful causes issues with seeking. Also, the buffer size should be larger to avoid
-        #  pauses (should be dynamic and loads the whole clip when reading from disk)
-        try:
-            if stateful:
-                with self.read_lock:
-                    self.state += 1
-                    self.state %= self.get(AUCAP_PROP_BUFFER_SIZE)
-                if self.state != 0:
-                    return False, None
-
-            frame = self.reader()
-            with self.read_lock:
-                self.set(AUCAP_PROP_POS_FRAMES,
-                         self.get(AUCAP_PROP_POS_FRAMES) + self.get(AUCAP_PROP_BUFFER_SIZE))
-                self.opened = True
-            return True, frame
-        except:
-            with self.read_lock:
-                self.opened = False
-            return False, None
-
-    def isOpened(self):
-            return self.opened
-
-    def release(self):
-        try:
-            self.stream.stop()
-        except:
-            self.stream = None
-        with self.read_lock:
-            self.state = 0
-
-    def set(self, propId, value):
-        self.properties[propId] = value
-
-    def get(self, propId):
-        return self.properties[propId]
 
 
 class SampleProcessor(object):
@@ -249,15 +91,30 @@ class SampleProcessor(object):
     Handles video (images/audio) and processes it in a format suitable for render and display
     """
     def __init__(self, width=None, height=None, enable_audio=True,
-                 video_reader=(cv2.VideoCapture,{}), audio_reader=(AudioCapture, {}), w_size=1, **kwargs):
+                 video_reader=("VideoCapture", {}), audio_reader=("AudioCapture", {}), w_size=1, sample_stride=1,
+                 # sample_overlap=False,  # sample_overlap is always False because reading is iterative
+                 **kwargs):
         self.video_cap = None
         self.audio_cap = None
         self.width = width
         self.height = height
         self.enable_audio = enable_audio
-        self.video_reader = video_reader
-        self.audio_reader = audio_reader
+
+        if video_reader is not None and isinstance(video_reader[0], str):
+            VideoCaptureRegistrar.scan()
+            self.video_reader = (VideoCaptureRegistrar.registry[video_reader[0]], video_reader[1])
+        else:
+            self.video_reader = video_reader
+
+        if audio_reader is not None and isinstance(audio_reader[0], str):
+            AudioCaptureRegistrar.scan()
+            self.audio_reader = (AudioCaptureRegistrar.registry[audio_reader[0]], audio_reader[1])
+        else:
+            self.audio_reader = audio_reader
+
         self.w_size = w_size
+        self.sample_stride = sample_stride
+
         self.video_out_path = ''
         self.audio_out_path = ''
 
@@ -272,19 +129,22 @@ class SampleProcessor(object):
 
     def load(self, metadata):
         # create the names for the output files
-        self.video_out_path = os.path.dirname(os.path.join("gazenet", "readers", "visualization", "assets", "media", str(metadata["video_name"])))
-        Path(self.video_out_path).mkdir(parents=True, exist_ok=True)
-        self.video_out_path  = os.path.join(self.video_out_path, 'temp_vid_' + os.path.basename(str(metadata["video_name"])) + '.avi')
-        if self.enable_audio and metadata["has_audio"]:
-            self.audio_out_path = os.path.dirname(os.path.join("gazenet", "readers", "visualization", "assets", "media", str(metadata["audio_name"])))
-            Path(self.audio_out_path).mkdir(parents=True, exist_ok=True)
-            self.audio_out_path = os.path.join(self.audio_out_path, 'temp_aud_' + os.path.basename(str(metadata["video_name"])) + '.wav')
+        # self.video_out_path = os.path.dirname(os.path.join("gazenet", "readers", "visualization", "assets", "media", str(metadata["video_name"])))
+        # Path(self.video_out_path).mkdir(parents=True, exist_ok=True)
+        # self.video_out_path  = os.path.join(self.video_out_path, 'temp_vid_' + os.path.basename(str(metadata["video_name"])) + '.avi')
+        # if self.enable_audio and metadata["has_audio"]:
+        #     self.audio_out_path = os.path.dirname(os.path.join("gazenet", "readers", "visualization", "assets", "media", str(metadata["audio_name"])))
+        #     Path(self.audio_out_path).mkdir(parents=True, exist_ok=True)
+        #     self.audio_out_path = os.path.join(self.audio_out_path, 'temp_aud_' + os.path.basename(str(metadata["video_name"])) + '.wav')
 
         if self.video_reader is not None:
             # setup the video capturer
             if self.video_cap is not None:
                 self.video_cap.release()
             video_properties = self.video_reader[1].copy()
+            metadata["video_name"] = video_properties.get("video_name", metadata["video_name"])
+            video_properties.pop("video_name", None)
+            video_properties.update(fps=metadata.get("video_fps", DEFAULT_FPS))
             self.video_cap = self.video_reader[0](metadata["video_name"], **video_properties)
 
         if self.enable_audio and metadata["has_audio"]:
@@ -293,6 +153,8 @@ class SampleProcessor(object):
                 if self.audio_cap is not None:
                     self.audio_cap.release()
                 audio_properties = self.audio_reader[1].copy()
+                metadata["audio_name"] = audio_properties.get("audio_name", metadata["audio_name"])
+                audio_properties.pop('audio_name', None)
                 if "buffer_size" not in audio_properties:
                     audio_properties["buffer_size"] = int(self.video_cap.get(cv2.CAP_PROP_FPS))
                 if "len_frames" not in audio_properties:
@@ -331,9 +193,13 @@ class SampleProcessor(object):
         else:
             return 0
 
+    def frame_time(self):
+        if self.video_cap is not None:
+            return float(self.video_cap.get(cv2.CAP_PROP_POS_MSEC))
+        else:
+            return 0.0
+
     def len_frames(self):
-        # curr_sample = self.reader.samples[self.index]
-        # return curr_sample['len_frames']
         if self.video_cap is not None:
             return int(self.video_cap.get(cv2.CAP_PROP_FRAME_COUNT))
         else:
@@ -364,7 +230,6 @@ class SampleProcessor(object):
             try:
                 cmd = q.get(timeout=2)
                 if cmd == 'play':
-                    # TODO (fabawi): this loops over all extracted grouped_video_frames. they should be returned as a list instead
                     preprocessed_data = self.preprocess_frames(*args, **kwargs)
                     if preprocessed_data is not None:
                         extracted_data_list = self.extract_frames(**preprocessed_data)
@@ -388,7 +253,10 @@ class SampleProcessor(object):
                             video_frame = None
 
                         if grabbed_audio:
-                            audio_frames = audio_frames.flatten()
+                            if len(audio_frames.shape) == 2:
+                                audio_frames = audio_frames.flatten()
+                            else:
+                                audio_frames = audio_frames.reshape(-1, audio_frames.shape[-1]*audio_frames.shape[-2])
                         else:
                             audio_frames = None
 
@@ -468,7 +336,6 @@ class SampleProcessor(object):
                            keep_plot_frames_only=False, resize_frames=False, convert_plots_gray=False,
                            duplicate_audio_frames=False,
                            *args, **kwargs):
-        # TODO (fabawi): these may break some functionality. Make sure to externally handle None values
         if not keep_video:
             grouped_video_frames_list = [None] * len(grouped_video_frames_list)
         if not keep_audio:
@@ -540,7 +407,9 @@ class SampleProcessor(object):
         properties_list = []
         for w_idx in range(self.w_size):
             if self.video_cap.isOpened() and extract_video:
-                grabbed_video, video_frame = self.video_cap.read()
+                for sample_stride in range(self.sample_stride):
+                    if self.video_cap.isOpened() and extract_video:
+                        grabbed_video, video_frame = self.video_cap.read()
             else:
                 grabbed_video, video_frame = False, None
             grouped_video_frames_list.append({"captured": video_frame})
@@ -613,11 +482,13 @@ class InferenceSampleProcessor(SampleProcessor):
     supported by the video processor
     """
     def __init__(self, width=None, height=None, w_size=1, **kwargs):
+        # TODO (fabawi): we disable audio for now, but might want to change that if we want to store
+        #  the captured audio on detection. In general, a better pattern needs to be followed for this to work
         super().__init__(width=width, height=height, w_size=w_size, enable_audio=False, video_reader=None, audio_reader=None,
                          **kwargs)
 
     def infer_frame(self, *args, **kwargs):
-        raise NotImplementedError("Infer not defined in base class")
+        raise NotImplementedError("Not implemented for base Inferer")
 
     def extract_frames(self, *args, **kwargs):
         return self.infer_frame(*args, **kwargs)
@@ -673,3 +544,15 @@ class InferenceSampleProcessor(SampleProcessor):
         else:
             return grabbed_video_list, grouped_video_frames_list, grabbed_audio_list, audio_frames_list, \
                    info_list, properties_list
+
+
+class ApplicationProcessor(object):
+    """
+    Every application must inherit this class. Applications are flexible in how they execute, but are limited in what
+    they can return for further processing
+    """
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def execute(self, *args, **kwargs):
+        raise NotImplementedError("Not implemented for base Application")

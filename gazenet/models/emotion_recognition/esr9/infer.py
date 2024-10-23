@@ -38,11 +38,12 @@ ENSEMBLES_NUM = 9
 class ESR9Inference(InferenceSampleProcessor):
     def __init__(self,  weights_path=MODEL_PATHS['esr9'],
                  shared_weights_basename=MODEL_PATHS["esr9_shared"],
-                 ensembles_weights_baseformat=MODEL_PATHS["esr9_ensembles"],
+                 ensembles_weights_basename=MODEL_PATHS["esr9_ensembles"],
                  enable_gradcam=True, ensembles_num=ENSEMBLES_NUM, trg_classes=TRG_CLASSES,
                  inp_img_width=INP_IMG_WIDTH, inp_img_height=INP_IMG_HEIGHT, inp_img_mean=INP_IMG_MEAN, inp_img_std=INP_IMG_STD,
                  device="cuda:0", width=None, height=None, **kwargs):
         super().__init__(width=width, height=height, **kwargs)
+
         self.short_name = "esr9"
         self._device = device
 
@@ -53,13 +54,15 @@ class ESR9Inference(InferenceSampleProcessor):
         self.inp_img_mean = inp_img_mean
         self.inp_img_std = inp_img_std
 
-        # load the model
+        # load the models
         self.model = ESR(ensembles_num=ensembles_num)
-        self.model.base.load_state_dict(torch.load(os.path.join(weights_path, shared_weights_basename), map_location=device))
-        self.model.base.to(device)
-        for en_idx, ensemble in enumerate(self.model.convolutional_branches, start=1):
-            ensemble.load_state_dict(torch.load(os.path.join(weights_path, ensembles_weights_baseformat.format(en_idx)), map_location=device))
-            ensemble.to(device)
+        if weights_path in MODEL_PATHS.keys():
+            weights_path = MODEL_PATHS[weights_path]
+        if shared_weights_basename in MODEL_PATHS.keys():
+            shared_weights_basename = MODEL_PATHS[shared_weights_basename]
+        if ensembles_weights_basename in MODEL_PATHS.keys():
+            ensembles_weights_basename = MODEL_PATHS[ensembles_weights_basename]
+        self.model.load_models(weights_path, shared_weights_basename, ensembles_weights_basename, device=device)
         print("ESR-9 model loaded from", weights_path)
         self.model.to(device)
         self.model.eval()
@@ -84,7 +87,7 @@ class ESR9Inference(InferenceSampleProcessor):
             img = video_frames_list[frame_id]
 
             for id, face_local in enumerate(faces_locations[frame_id]):
-                if not face_local:
+                if not face_local or img is None:
                     continue
                 sample_emotions = []
                 sample_emotions_idx = []

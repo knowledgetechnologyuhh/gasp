@@ -6,7 +6,7 @@ Class for reading and decoding the Coutrot1 [1] and Coutrot2 [2] datasets
     How saliency, faces, and sound influence gaze in dynamic social scenes.
     Journal of vision, 14(8), 5-5.
 
-[2] Coutrot, A., & Guyader, N. (2015, August).
+[2] Coutrot, A., & Guyader, N. (2015).
     An efficient audiovisual saliency model to infer eye positions when looking at conversations.
     In 2015 23rd European Signal Processing Conference (EUSIPCO) (pp. 1531-1535). IEEE.
 """
@@ -43,16 +43,16 @@ class CoutrotSampleReader(SampleReader):
         # single annotations file in matlab format
         annotations = sio.loadmat(self.annotations_file)
         # annotations['Coutrot_Database1'][0][0][x] Auditory condition -> clips in red on webpage are actually excluded
-        # annotations['Coutrot_Database1']['OriginalSounds'][0][0]['clip_1'][0][0][0][0]['data'][1][2][3] -> [1]:x(0),y(1),[2]: video_frames_list, [3]: participents?
+        # annotations['Coutrot_Database1']['OriginalSounds'][0][0]['clip_1'][0][0][0][0]['data'][1][2][3] -> [1]:x(0),y(1),[2]: video_frames_list, [3]: participants?
 
         for video_name in tqdm(sorted(os.listdir(self.video_dir)), desc="Samples Read"):
             if video_name.endswith("." + self.video_format):
-                id = video_name.replace("." + self.video_format, "")
+                sample_id = video_name.replace("." + self.video_format, "")
 
                 try:
                     # annotation assembly
-                    annotation = annotations[self.database_type][self.auditory_condition][0][0][id][0][0][0]
-                    self.samples.append({"id": id,
+                    annotation = annotations[self.database_type][self.auditory_condition][0][0][sample_id][0][0][0]
+                    self.samples.append({"id": sample_id,
                                          "audio_name": os.path.join(self.video_dir, video_name),
                                          "video_name": os.path.join(self.video_dir, video_name),
                                          "video_fps": annotation['info'][0]['fps'][0][0][0][0],
@@ -62,19 +62,19 @@ class CoutrotSampleReader(SampleReader):
                                              os.path.join(self.video_dir, video_name)) if self.extract_thumbnails else None,
                                          "len_frames": annotation['info'][0]['nframe'][0][0][0][0],
                                          "has_audio": check_audio_in_video(os.path.join(self.video_dir, video_name)),
-                                         "annotation_name": os.path.join(self.database_type, self.auditory_condition, id),
+                                         "annotation_name": os.path.join(self.database_type, self.auditory_condition, sample_id),
                                          "annotations": {"xyp": annotation['data'][0]}
                                          })
-                    self.video_id_to_sample_idx[id] = len(self.samples) - 1
+                    self.video_id_to_sample_idx[sample_id] = len(self.samples) - 1
                     self.len_frames += self.samples[-1]["len_frames"]
                 except:
-                    print("Error: Access non-existent annotation " + id)
+                    print("Error: Access non-existent annotation " + sample_id)
 
     @staticmethod
     def dataset_info():
-        return {"summary": "TODO",
+        return {"summary": "NONE",
                 "name": "Coutrot Dataset",
-                "link": "TODO"}
+                "link": "http://antoinecoutrot.magix.net/public/databases.html"}
 
 @ReaderRegistrar.register
 class Coutrot1SampleReader(CoutrotSampleReader):
@@ -89,9 +89,9 @@ class Coutrot1SampleReader(CoutrotSampleReader):
 
     @staticmethod
     def dataset_info():
-        return {"summary": "TODO",
+        return {"summary": "Coutrot 1 dataset consists of eye tracking data for 18 participants on 60 videos, with clips 46-60 retained only (faces).",
                 "name": "Coutrot Dataset1 (Coutrot et al.)",
-                "link": "TODO"}
+                "link": "http://antoinecoutrot.magix.net/public/databases.html"}
 
 @ReaderRegistrar.register
 class Coutrot2SampleReader(CoutrotSampleReader):
@@ -106,9 +106,9 @@ class Coutrot2SampleReader(CoutrotSampleReader):
 
     @staticmethod
     def dataset_info():
-        return {"summary": "TODO",
-                "name": "Coutrot Dataset2 (Coutrot et al.)",
-                "link": "TODO"}
+        return {"summary": "Coutrot 2 dataset consists of eye tracking data for 20 participants on 15 videos, each with 4 persons having a meeting.",
+                "name": "Coutrot Dataset2 (Coutrot and Guyader)",
+                "link": "http://antoinecoutrot.magix.net/public/databases.html"}
 
 @SampleRegistrar.register
 class CoutrotSample(SampleProcessor):

@@ -6,6 +6,8 @@
 # Copyright by Hamed Rezazadegan Tavakoli
 #
 
+import os
+import re
 
 import torch
 import torch.nn as nn
@@ -48,6 +50,27 @@ class DAVE(nn.Module):
         self.combinedEmbedding = nn.Conv2d(1024, 512, kernel_size=1)
         self.saliency = nn.Conv2d(128, 1, kernel_size=1)
         self._weights_init()
+
+    def load_model(self, weights_file, device=None):
+        self.load_state_dict(self._load_state_dict_(weights_file, device), strict=True)
+
+    @staticmethod
+    def _load_state_dict_(weights_file, device=None):
+        if os.path.isfile(weights_file):
+            # print("=> loading checkpoint '{}'".format(filepath))
+            if device is None:
+                checkpoint = torch.load(weights_file)
+            else:
+                checkpoint = torch.load(weights_file, map_location=torch.device(device))
+            pattern = re.compile(r'module+\.*')
+            state_dict = checkpoint['state_dict']
+            for key in list(state_dict.keys()):
+                res = pattern.match(key)
+                if res:
+                    new_key = re.sub('module.', '', key)
+                    state_dict[new_key] = state_dict[key]
+                    del state_dict[key]
+            return state_dict
 
     def _weights_init(self):
 

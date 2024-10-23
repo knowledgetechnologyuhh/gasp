@@ -2,6 +2,8 @@
 code from: https://raw.githubusercontent.com/MichiganCOG/TASED-Net/master/model.py
 """
 
+import os
+
 import torch
 from torch import nn
 
@@ -83,6 +85,27 @@ class TASED_v2(nn.Module):
             nn.Conv3d(4, 1, kernel_size=1, stride=1, bias=True),
             nn.Sigmoid(),
         )
+
+    def load_model(self, weights_file, device=None):
+        self._load_model_(weights_file, device)
+
+    def _load_model_(self, weights_file, device=None):
+        if os.path.isfile(weights_file):
+            if device is None:
+                weight_dict = torch.load(weights_file)
+            else:
+                weight_dict = torch.load(weights_file, map_location = torch.device(device))
+            model_dict = self.state_dict()
+            for name, param in weight_dict.items():
+                if 'module' in name:
+                    name = '.'.join(name.split('.')[1:])
+                if name in model_dict:
+                    if param.size() == model_dict[name].size():
+                        model_dict[name].copy_(param)
+                    else:
+                        print(' size? ' + name, param.size(), model_dict[name].size())
+                else:
+                    print(' name? ' + name)
 
     def forward(self, x):
         y3 = self.base1(x)

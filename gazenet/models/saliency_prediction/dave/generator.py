@@ -1,5 +1,5 @@
 import torch
-import torchvision.transforms.functional as F
+import torchvision.transforms.functional as Fv
 import numpy as np
 import librosa as sf
 from PIL import Image
@@ -55,8 +55,8 @@ def load_video_frames(frames_list, last_frame_idx, valid_frame_idx, img_mean, im
                 img = np.zeros((img_height, img_width, 3), dtype=np.uint8)
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         # img = img.convert('RGB')
-        img = F.to_tensor(img)
-        img = F.normalize(img, img_mean, img_std)
+        img = Fv.to_tensor(img)
+        img = Fv.normalize(img, img_mean, img_std)
         frames.append(img)
     frames = torch.stack(frames, dim=0)
     return frames.permute([1, 0, 2, 3])

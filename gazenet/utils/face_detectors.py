@@ -78,19 +78,23 @@ class SFDFaceDetection:
         # images = self.__np__.asarray(video_frames_list)[..., ::-1]
         # images = self.__np__.squeeze(images, axis=1)
         # images = self.__torch__.FloatTensor(images)
-        images = self.__np__.moveaxis(self.__np__.stack(video_frames_list), -1, 1)
-        images =  self.__torch__.from_numpy(images).to(device=self.device)
-        detected_faces = self.face_detector.detect_from_batch(images)
-        face_locations = []
+        stacked_images = self.__np__.stack(video_frames_list)
+        if len(stacked_images.shape) < 2:
+            return []
+        else:
+            images = self.__np__.moveaxis(stacked_images, -1, 1)
+            images =  self.__torch__.from_numpy(images).to(device=self.device)
+            detected_faces = self.face_detector.detect_from_batch(images)
+            face_locations = []
 
-        for i, d in enumerate(detected_faces):
-            if len(d) == 0:
-                face_locations.append([])
-                continue
-            boxes = []
-            for b in d:
-                b = self.__np__.clip(b, 0, None)
-                x1, y1, x2, y2 = map(int, b[:-1])
-                boxes.append([y1, x2, y2, x1])
-            face_locations.append(boxes)
-        return face_locations
+            for i, d in enumerate(detected_faces):
+                if len(d) == 0:
+                    face_locations.append([])
+                    continue
+                boxes = []
+                for b in d:
+                    b = self.__np__.clip(b, 0, None)
+                    x1, y1, x2, y2 = map(int, b[:-1])
+                    boxes.append([y1, x2, y2, x1])
+                face_locations.append(boxes)
+            return face_locations

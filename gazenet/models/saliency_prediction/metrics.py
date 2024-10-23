@@ -1,5 +1,7 @@
 """
 code from: https://github.com/tarunsharma1/saliency_metrics/blob/master/salience_metrics.py
+
+Modified by Fares Abawi (fares.abawi@uni-hamburg.de)
 """
 
 import random
@@ -27,12 +29,15 @@ def discretize_gt(gt):
 @MetricsRegistrar.register
 class SaliencyPredictionMetrics(object):
     def __init__(self, save_file="logs/metrics/salpred.csv", dataset_name="", video_name="",
-                 metrics_list=["sim", "aucj", "aucs", "aucb", "nss", "cc", "kld", "ifg"], map_key="frame_detections_gasp"):
+                 metrics_list=["sim", "aucj", "aucs", "aucb", "nss", "cc", "kld", "ifg"],
+                 map_key="frame_detections_gasp", metrics_mappings=None, *args, **kwargs):
 
         self.save_file = save_file
         os.makedirs(os.path.dirname(save_file), exist_ok=True)
         self.metrics_list = metrics_list
         self.map_key = map_key
+        self.metrics_mappings = metrics_mappings
+
         self._dataset_name = dataset_name
         self._video_name = video_name
 
@@ -95,7 +100,7 @@ class SaliencyPredictionMetrics(object):
             self.save()
         return collated_metrics, other_scores
 
-    def add_metrics(self, returns, models, mapping):
+    def add_metrics(self, returns, models, *args, **kwargs):
         metrics_args = {}
         eval_frame_id = 0
         baseline_imgs = []
@@ -103,17 +108,18 @@ class SaliencyPredictionMetrics(object):
             for i, frame_dict in enumerate(returns[2 + idx_model][4]):
                 # get the image frames
                 for img_name in returns[2 + idx_model][1][i].keys():
-                    if img_name in mapping.values():
+                    if img_name in self.metrics_mappings.values():
                         img = returns[2 + idx_model][1][i][img_name]
-                        metrics_args[list(mapping.keys())[list(mapping.values()).index(img_name)]] = img
+                        metrics_args[list(self.metrics_mappings.keys())[list(self.metrics_mappings.values()).index(img_name)]] = img
                         eval_frame_id = frame_dict["frame_info"]["frame_id"]
                 # get the scores info from the annotations if specified: scores should be a vector e.g. the gate scores
-                if "scores_info" in mapping.keys():
-                    for score_name in mapping["scores_info"]:
+                if "scores_info" in self.metrics_mappings.keys():
+                    for score_name in self.metrics_mappings["scores_info"]:
+                        # TODO (fabawi): this should be agnostic to GASP, but right now it works only for GASP variants
                         try:
                             if score_name in frame_dict[self.map_key]:
                                 if score_name in self.other_accumulator:
-                                    self.other_accumulator[score_name].append(frame_dict[][score_name][0][0])
+                                    self.other_accumulator[score_name].append(frame_dict[self.map_key][score_name][0][0])
                                 else:
                                     column_list = [str(idx) for idx in range(frame_dict[self.map_key][score_name][0][0].shape[0])]
                                     if not score_name in self.other_scores:
@@ -123,8 +129,8 @@ class SaliencyPredictionMetrics(object):
                             pass
 
         # extract all the frames besides the evaluation frame for creating the baseline map if needed
-        if "gt_baseline" in mapping.keys():
-            baseline_name = mapping["gt_baseline"]
+        if "gt_baseline" in self.metrics_mappings.keys():
+            baseline_name = self.metrics_mappings["gt_baseline"]
             if "/" in baseline_name:
                 metrics_args["gt_baseline"] = cv2.imread(baseline_name)
             else:
@@ -143,7 +149,7 @@ class SaliencyPredictionMetrics(object):
                 self.accumulator[metric_name].append(metric_val)
         return metrics
 
-    def compute_metrics(self, pred_salmap, gt_fixmap, gt_salmap, gt_baseline=None):
+    def compute_metrics(self, pred_salmap=None, gt_fixmap=None, gt_salmap=None, gt_baseline=None):
         if pred_salmap is None or gt_fixmap is None or gt_salmap is None:
             return None
         else:
@@ -253,11 +259,8 @@ class SaliencyPredictionMetrics(object):
             fp = (np.sum(temp) - num_overlap) / ((np.shape(gt)[0] * np.shape(gt)[1]) - num_fixations)
 
             area.append((round(tp, 4), round(fp, 4)))
-        
+
         area.append((1.0, 1.0))
-        # tp_list.append(1.0)
-        # fp_list.append(1.0)
-        # print tp_list
         area.sort(key=lambda x: x[0])
         tp_list = [x[0] for x in area]
         fp_list = [x[1] for x in area]
@@ -265,7 +268,6 @@ class SaliencyPredictionMetrics(object):
 
     @staticmethod
     def auc_shuff(s_map, gt, other_map, n_splits=100, stepsize=0.1):
-
         # If there are no fixations to predict, return NaN
         if np.sum(gt) == 0:
             return np.nan

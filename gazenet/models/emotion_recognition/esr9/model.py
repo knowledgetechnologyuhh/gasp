@@ -18,7 +18,7 @@ __license__ = "MIT license"
 __version__ = "1.0"
 
 # Standard libraries
-from os import path
+import os
 
 # External libraries
 import torch.nn.functional as F
@@ -177,6 +177,23 @@ class ESR(nn.Module):
         self.convolutional_branches = []
         for i in range(1, ensembles_num + 1):
             self.convolutional_branches.append(ConvolutionalBranch())
+
+    def load_models(self, weights_path, shared_weights_basename, ensembles_weights_basename, device=None):
+        if device is None:
+            self.base.load_state_dict(
+                torch.load(os.path.join(weights_path, shared_weights_basename)))
+        else:
+            self.base.load_state_dict(
+                torch.load(os.path.join(weights_path, shared_weights_basename), map_location=device))
+            self.base.to(device)
+        for en_idx, ensemble in enumerate(self.convolutional_branches, start=1):
+            if device is None:
+                ensemble.load_state_dict(torch.load(os.path.join(weights_path, ensembles_weights_basename.format(en_idx))))
+            else:
+                ensemble.load_state_dict(
+                    torch.load(os.path.join(weights_path, ensembles_weights_basename.format(en_idx)),
+                               map_location=device))
+                ensemble.to(device)
 
     def forward(self, x):
         """

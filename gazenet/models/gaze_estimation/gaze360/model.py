@@ -14,6 +14,16 @@ import numpy as np
 
 from gazenet.models.shared_components.resnet.model import resnet18
 
+class DataParallel(torch.nn.DataParallel):
+    def __init__(self, *args, **kwargs):
+        super(DataParallel, self).__init__(*args, **kwargs)
+
+    def load_model(self, weights_file, device=None):
+        if device is None:
+            self.load_state_dict(torch.load(weights_file)['state_dict'])
+        else:
+            self.load_state_dict(torch.load(weights_file, map_location=torch.device(device))['state_dict'])
+
 
 class GazeLSTM(nn.Module):
     def __init__(self):
@@ -29,9 +39,7 @@ class GazeLSTM(nn.Module):
         # The linear layer that maps the LSTM with the 3 outputs
         self.last_layer = nn.Linear(2*self.img_feature_dim, 3)
 
-
     def forward(self, input):
-
         base_out = self.base_model(input.view((-1, 3) + input.size()[-2:]))
 
         base_out = base_out.view(input.size(0),7,self.img_feature_dim)

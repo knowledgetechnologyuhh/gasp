@@ -40,13 +40,13 @@ class DIEMSampleReader(SampleReader):
                                   "right_dil", "right_event"]
         ids = [dI for dI in sorted(os.listdir(self.video_audio_annotations_dir)) if os.path.isdir(os.path.join(self.video_audio_annotations_dir, dI))]
 
-        for id in tqdm(ids, desc="Samples Read"):
-            video_dir = os.path.join(self.video_audio_annotations_dir, id, "video")
-            video_name = id + "." + self.video_format
-            audio_dir = os.path.join(self.video_audio_annotations_dir, id, "audio")
-            audio_name = id + "." + self.audio_format
-            annotations_dir = os.path.join(self.video_audio_annotations_dir, id, "event_data")
-            annotations_name = "*" + id + "." + self.annotation_format
+        for sample_id in tqdm(ids, desc="Samples Read"):
+            video_dir = os.path.join(self.video_audio_annotations_dir, sample_id, "video")
+            video_name = sample_id + "." + self.video_format
+            audio_dir = os.path.join(self.video_audio_annotations_dir, sample_id, "audio")
+            audio_name = sample_id + "." + self.audio_format
+            annotations_dir = os.path.join(self.video_audio_annotations_dir, sample_id, "event_data")
+            annotations_name = "*" + sample_id + "." + self.annotation_format
             # [frame] [left_x] [left_y] [left_dil] [left_event] [right_x] [right_y] [right_dil] [right_event]
             # Frames are 30 video_frames_list per second, indexed at 1; x,y are screen coordinates; dil represents pupil dilation; and the event flag represents:
             # -1 = Error/dropped frame
@@ -58,14 +58,14 @@ class DIEMSampleReader(SampleReader):
             annotations = []
             for part_id, annotation_path in enumerate(sorted(glob(os.path.join(annotations_dir, annotations_name)))):
                 annotation_name = os.path.basename(annotation_path)
-                part_name = annotation_name.replace("_" + id + "." + self.annotation_format, "")
+                part_name = annotation_name.replace("_" + sample_id + "." + self.annotation_format, "")
                 # annotation assembly
                 annotation = pd.read_csv(annotation_path, sep="\t", names=self.annotation_columns)
                 annotation["participant"] = part_name
                 annotation["participant_id"] = part_id
                 annotations.append(annotation)
             video_width_height = extract_width_height_from_video(os.path.join(video_dir, video_name))
-            self.samples.append({"id": id,
+            self.samples.append({"id": sample_id,
                                  "audio_name": os.path.join(audio_dir, audio_name),
                                  "video_name": os.path.join(video_dir, video_name),
                                  "video_width": video_width_height[0],
@@ -75,7 +75,7 @@ class DIEMSampleReader(SampleReader):
                                  "annotation_name": os.path.join(annotations_dir, annotations_name),
                                  "has_audio": True,
                                  "annotations": pd.concat(annotations, axis=0, ignore_index=True, sort=False)})
-            self.video_id_to_sample_idx[id] = len(self.samples) - 1
+            self.video_id_to_sample_idx[sample_id] = len(self.samples) - 1
             self.samples[-1].update({"len_frames": int(self.samples[-1]["annotations"]["frame"].max())})
             self.len_frames += self.samples[-1]["len_frames"]
 

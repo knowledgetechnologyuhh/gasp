@@ -1,6 +1,10 @@
+import torch
 import torch.nn as nn
+from mmcv.cnn import xavier_init, constant_init, normal_init
+
 
 nb_timestep = 4
+
 
 # https://github.com/PanoAsh/Saliency-Attentive-Model-Pytorch/blob/master/main.py
 class AttentiveLSTM(nn.Module):
@@ -110,3 +114,50 @@ class SequenceAttentiveLSTM(AttentiveLSTM):
             h_curr = h_next
 
         return h_curr
+
+
+# https://github.com/chenxy99/Scanpaths/blob/main/COCO_Search18/models/baseline_attention_multihead.py
+class SpatialSemanticLSTM(nn.Module):
+    def __init__(self, embed_size=512):
+        super(SpatialSemanticLSTM, self).__init__()
+        #LSTM gates
+        self.input_x = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.forget_x = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.output_x = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.memory_x = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.input_h = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.forget_h = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.output_h = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.memory_h = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+
+        self.input = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.forget = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+        self.output = nn.Conv2d(embed_size, embed_size, kernel_size=3, padding=1, stride=1, bias=True)
+
+        self.init_weights()
+
+    def forward(self, x, state, spatial, semantic):
+        batch, channel, col, row = x.size()
+
+        spatial_semantic = spatial.unsqueeze(1) * semantic.unsqueeze(-1).unsqueeze(-1)
+
+        h, c = state[0], state[1]
+        i = torch.sigmoid(self.input_x(x) + self.input_h(h) + self.input(spatial_semantic))
+        f = torch.sigmoid(self.forget_x(x) + self.forget_h(h) + self.forget(spatial_semantic))
+        o = torch.sigmoid(self.output_x(x) + self.output_h(h) + self.output(spatial_semantic))
+        g = torch.tanh(self.memory_x(x) + self.memory_h(h))
+
+        next_c = f * c + i * g
+        h = o * next_c
+        state = (h, next_c)
+
+        return h, state
+
+    def init_weights(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                xavier_init(m)
+            elif isinstance(m, nn.BatchNorm2d):
+                constant_init(m, 1)
+            elif isinstance(m, nn.Linear):
+                normal_init(m, std=0.01)

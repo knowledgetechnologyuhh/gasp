@@ -11,12 +11,11 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Modified by Fares Abawi (abawi@informatik.uni-hamburg.de)
+# Modified by Fares Abawi (fares.abawi@uni-hamburg.de)
 # ==============================================================================
 
 
 import resampy
-
 import numpy as np
 
 from gazenet.utils.registrar import *
@@ -38,6 +37,7 @@ class WindowedAudioFeatures(object):
         # TODO (fabawi): check the hanning
         audiowav = np.hanning(audiowav.shape[1]) * audiowav
         return audiowav
+
 
 @AudioFeatureRegistrar.register
 class MFCCAudioFeatures(object):
@@ -237,14 +237,13 @@ class MFCCAudioFeatures(object):
             spectro_len=spectrogram.shape[1]))
         return np.log(mel_spectrogram + self.log_offset)
 
-    def waveform_to_feature(self, data, rate):
+    def extract_feature(self, data, rate, mono=False):
         """Converts audio waveform into an array of examples for VGGish.
 
         Args:
-        data: np.array of either one dimension (mono) or two dimensions
-          (multi-channel, with the outer dimension representing channels).
-          Each sample is generally expected to lie in the range [-1.0, +1.0],
-          although this is not required.
+        sound: np.array of  two dimensions(multi-channel, with the
+            outer dimension representing channels). Each sample is generally
+            expected to lie in the range [-1.0, +1.0], although this is not required.
         sample_rate: Sample rate of data
 
         Returns:
@@ -253,13 +252,19 @@ class MFCCAudioFeatures(object):
         spectrogram, covering num_frames video_frames_list of audio and num_bands mel frequency
         bands, where the frame length is vggish_params.STFT_HOP_LENGTH_SECONDS.
         """
-        data = data.flatten()[..., np.newaxis]
-        # convert to mono.
+        if mono:
+            data = data.flatten()[...]
+        else:
+            data = data.flatten()[..., np.newaxis]
+        # # convert to mono.
         if len(data.shape) > 1:
             data = np.mean(data, axis=1)
 
         # resample to the rate assumed by VGGish
         if rate != self.rate:
+            if rate > data.shape[0]:
+                data = np.append(data, np.zeros((rate - data.shape[0],)), axis=0)
+            # TODO (fabawi): set this to data.copy() which is expensive but might avoid memory pointer issues
             data = resampy.resample(data, rate, self.rate)
 
         # compute log mel spectrogram features
@@ -276,3 +281,23 @@ class MFCCAudioFeatures(object):
             win_len=example_win_len,
             hop_len=example_hop_len)
         return log_mel_examples
+
+    def waveform_to_feature(self, sound, rate):
+
+        # TODO (fabawi): implement a better way to distinguish mono from stereo
+        # if len(sound.shape) > 3:
+        if len(sound.shape) > 2 and sound.shape[2] > 1:
+            # if channels last, then rotate sound. This will break if no. of channels is more than the framerate but that should not happen
+            if sound.shape[0] > sound.shape[2]:
+                sound = np.moveaxis(sound, -1, 0)
+            log_mel_examples = None
+            for data in sound:
+                if log_mel_examples is None:
+                    log_mel_examples = self.extract_feature(data, rate)
+                else:
+                    log_mel_examples = np.stack((log_mel_examples, self.extract_feature(data, rate)), axis=0)
+            return log_mel_examples[np.newaxis, ...]
+        else:
+            log_mel_examples = self.extract_feature(sound, rate, mono=True)
+            return log_mel_examples
+

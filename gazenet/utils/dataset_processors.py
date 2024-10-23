@@ -1,68 +1,198 @@
-import pickle
 import os
+import random
 
 import cv2
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
+from torch.utils.data import Dataset
 
 from gazenet.utils.registrar import *
 from gazenet.utils.helpers import extract_width_height_thumbnail_from_image
-from gazenet.utils.sample_processors import SampleReader, SampleProcessor, ImageCapture
+from gazenet.utils.sample_processors import SampleReader, SampleProcessor
+
+try:  # pickle with protocol 5 if python<3.8
+    import pickle5 as pickle
+except:
+    import pickle
 
 
-# TODO (fabawi): support annotation reading
+class BaseDataset(Dataset):
+    def __init__(self, csv_file, video_dir, annotation_dir, classes,
+                 inp_img_names_list, inp_img_width=320, inp_img_height=240, inp_img_transform=None,
+                 orig_img_width=1280, orig_img_height=720,
+                 sequence_len=1, sample_stride=1, sample_overlap=False, replicate_class_samples=True):
+        """
+        Args:
+            csv_file (string): Path to the csv file with the sample descriptions
+            video_dir (string): Directory with all the frames separated into folders
+            annotation_dir (string): Directory with all the annotations separated into files
+            inp_img_names_list (list): List of the input image prefixes
+            inp_img_transform (callable, optional): Optional transform applied to the input image
+            sequence_len (int): Length of an image sequence. If None, the sequence dimension is removed
+            sample_stride (int): Number of frames skipped between timesteps
+            sample_overlap (bool): Traverse every timestep. If False, scanned samples will be skipped in following itrs
+            replicate_class_samples (bool): replicates each participant point as new sample rather than returning all
+        """
+        self.samples = pd.read_csv(csv_file, dtype={"video_id": "string"})
+        self.samples = self.samples[(self.samples["scene_type"] == "Social")].reset_index()
+        self.video_dir = video_dir
+        self.annotation_dir = annotation_dir
+        self.classes = classes
+        self.input_img_width = inp_img_width
+        self.input_img_height = inp_img_height
+        self.input_img_names_list = inp_img_names_list
+        self.input_img_transform = inp_img_transform
+        self.sequence_len = sequence_len
+        self.sample_stride = sample_stride
+        self.sample_overlap = sample_overlap
+        self.replicate_class_samples = replicate_class_samples
+
+        self.img_factor = (inp_img_width / orig_img_width, inp_img_height / orig_img_height)
+
+        self.enumerate_video_frames()
+
+    def enumerate_video_frames(self):
+        self.samples["frames_len"] = self.samples.apply(lambda row:
+                                                        len(os.listdir(os.path.join(self.annotation_dir if
+                                                                                    self.annotation_dir else
+                                                                                    self.video_dir, row["dataset"],
+                                                                                    row["video_id"]))), axis=1)
+        if self.classes and self.replicate_class_samples:
+            old_len = len(self.samples)
+            self.samples = pd.concat([self.samples]*len(self.classes))
+            self.samples = self.samples.reset_index(drop=True)
+            self.samples['participant_id'] = self.samples.index // old_len + 1
+
+        self.samples["frame_pointer"] = self.samples["frames_len"].rolling(min_periods=1,
+                                                                           window=len(self.samples)).sum()
+
+    def __len__(self):
+        if self.sample_overlap:
+            return int(self.samples["frame_pointer"].iloc[-1])
+        else:
+            return int(self.samples["frame_pointer"].iloc[-1] // self.sample_stride)
+
+    def __getfilenames__(self, global_idx):
+        if not self.sample_overlap:
+            global_idx *= self.sample_stride
+
+        idx = self.samples.index[self.samples["frame_pointer"] > global_idx].tolist()[0]
+
+        ds_name = self.samples.loc[idx, "dataset"]
+        vid_name = self.samples.loc[idx, "video_id"]
+        vid_len = self.samples.loc[idx, "frames_len"]
+
+        if self.replicate_class_samples:
+            cat_id = self.samples.loc[idx, "participant_id"]
+            cat_name = "p" + str(cat_id)
+        elif self.classes:
+            cat_id = random.randrange(1, len(self.classes)+1)
+            cat_name = "p" + str(cat_id)
+        else:
+            cat_id = 0
+            cat_name = None
+
+        curr_idx = int(global_idx - self.samples.loc[idx, "frame_pointer"] + self.samples.loc[idx, "frames_len"] + 1)
+
+        if self.annotation_dir:
+            vid_anno_path = os.path.join(self.annotation_dir, ds_name, vid_name)
+            annotations_paths = [os.path.join(vid_anno_path, str(min(vid_len, frame_idx))) for frame_idx in
+                                range(curr_idx, curr_idx + (self.sequence_len * self.sample_stride), self.sample_stride)]
+        else:
+            annotations_paths = None
+        if self.video_dir:
+            vid_img_path = os.path.join(self.video_dir, ds_name, vid_name)
+            imgs_paths = [os.path.join(vid_img_path, str(min(vid_len, frame_idx))) for frame_idx in
+                                range(curr_idx, curr_idx + (self.sequence_len * self.sample_stride), self.sample_stride)]
+        else:
+            imgs_paths = None
+
+        return annotations_paths, imgs_paths, ds_name, vid_name, cat_name, int(cat_id), vid_len
+
+
 @ReaderRegistrar.register
 class DataSampleReader(SampleReader):
-    def __init__(self,  video_dir="datasets/processed/Grouped_frames",
-                 annotations_dir=None,
+    def __init__(self, video_dir="datasets/processed/Grouped_frames",
+                 annotations_dir="datasets/processed/Annotations",
                  extract_thumbnails=True,
                  thumbnail_image_file="captured_1.jpg",
-                 pickle_file="temp/processed.pkl", mode=None, **kwargs):
+                 pickle_file="temp/processed.pkl", pickle_mappings=None, mode=None, **kwargs):
         self.short_name = "processed"
         self.video_dir = video_dir
         self.annotations_dir = annotations_dir
         self.extract_thumbnails = extract_thumbnails
         self.thumbnail_image_file = thumbnail_image_file
+        self.pickle_mappings = pickle_mappings
+
+        if pickle_mappings is not None:
+            self.pickle_mappings = {}
+            try:
+                for pickle_key, pickle_val in pickle_mappings.items():
+                    self.pickle_mappings[pickle_key] = SampleReader(pickle_file=pickle_val, mode="r")
+            except:
+                print("WARNING: Provided pickle mapping in processed dataset is not found or cannot be processed",
+                      pickle_key, pickle_val)
 
         super().__init__(pickle_file=pickle_file, mode=mode, **kwargs)
 
     def read_raw(self):
         video_groups = [video_group for video_group in sorted(os.listdir(self.video_dir))]
         video_names = [os.path.join(video_group, video_name) for video_group in video_groups
-                       for video_name in sorted(os.listdir(os.path.join(self.video_dir, video_group)))]
+                       for video_name in sorted(os.listdir(os.path.join(self.video_dir, video_group)))
+                       if os.path.isdir(os.path.join(self.video_dir, video_group, video_name))]
 
         for video_name in tqdm(video_names, desc="Samples Read"):
-            id = video_name
             try:
-
                 len_frames = len([name for name in os.listdir(os.path.join(self.video_dir, video_name))
                                   if os.path.isdir(os.path.join(self.video_dir, video_name))])
                 width, height, thumbnail = extract_width_height_thumbnail_from_image(
-                    os.path.join(self.video_dir, video_name, "1", self.thumbnail_image_file))
+                    # 5 is arbitrary to avoid missing initial frames
+                    os.path.join(self.video_dir, video_name, "5", self.thumbnail_image_file))
 
-                self.samples.append({"id": id,
-                                     "audio_name": '',
-                                     "video_name": os.path.join(self.video_dir, video_name),
-                                     "video_fps": 25,  # 30
-                                     "video_width": width,
-                                     "video_height":height,
-                                     "video_thumbnail": thumbnail,
+                video_info = {"video_name": os.path.join(self.video_dir, video_name),
+                              "video_fps": 25,
+                              "video_width": width,
+                              "video_height": height,
+                              "video_thumbnail": thumbnail}
+                audio_info = {"audio_name": '',
+                              "has_audio": False}
+
+                # if pickle mappings are provided for preprocessed datasets, then they will update video and audio data
+                if self.pickle_mappings is not None:
+                    pickled_data = self.pickle_mappings.get(video_name.split("/")[0], None)
+                    if pickled_data is not None:
+                        try:
+                            sample = pickled_data.samples[pickled_data.video_id_to_sample_idx[video_name.split("/")[1]]]
+                            update_data = True
+                        except:
+                            update_data = False
+                        if update_data:
+                            video_info.update(**{"video_src_name": sample["video_name"],
+                                                 "video_src_width": sample["video_width"],
+                                                 "video_src_height": sample["video_height"],
+                                                 "video_fps": sample["video_fps"],
+                                                 "video_thumbnail": sample["video_thumbnail"]})
+                            audio_info = {"audio_src_name": sample["audio_name"],
+                                          "audio_name": sample["audio_name"],
+                                          "has_audio": sample["has_audio"]}
+
+                self.samples.append({"id": video_name,
+                                     **video_info, **audio_info,
                                      "len_frames": len_frames,
-                                     "has_audio": False,
-                                     "annotation_name": os.path.join('videogaze', id),
+                                     "annotation_name": os.path.join(self.annotations_dir, video_name),
                                      "annotations": {}
                                      })
-                self.video_id_to_sample_idx[id] = len(self.samples) - 1
+                self.video_id_to_sample_idx[video_name] = len(self.samples) - 1
                 self.len_frames += self.samples[-1]["len_frames"]
             except:
-                print("Error: Access non-existent annotation " + id)
+                print("Error: Access non-existent annotation " + video_name)
 
     @staticmethod
     def dataset_info():
-        return {"summary": "TODO",
+        return {"summary": "The GASP processed dataset",
                 "name": "Processed Dataset",
-                "link": "TODO"}
+                "link": "https://github.com/knowledgetechnologyuhh/gasp/tree/GASP_USP_BinDAVE/datasets/processed"}
 
 
 @SampleRegistrar.register
@@ -73,14 +203,12 @@ class DataSample(SampleProcessor):
         self.reader = reader
         self.index = index
 
+        super().__init__(width=width, height=height,
+                         video_reader=("ImageCapture", {"extension": "jpg",
+                                                        "sub_directories": True,
+                                                        "image_file": "captured_1"}), **kwargs)
         if frame_index > 0:
             self.goto_frame(frame_index)
-
-        kwargs.update(enable_audio=False)
-        super().__init__(width=width, height=height,
-                         video_reader=(ImageCapture, {"extension": "jpg",
-                                                      "sub_directories": True,
-                                                      "image_file": "captured_1"}), **kwargs)
         next(self)
 
     def __next__(self):
@@ -123,10 +251,6 @@ class DataSample(SampleProcessor):
         properties = {}
 
         info = {**info, "frame_annotations": {}}
-        # info["frame_info"]["dataset_name"] = self.reader.short_name
-        # info["frame_info"]["video_id"] = self.reader.samples[self.index]["id"]
-        # info["frame_info"]["frame_height"] = self.reader.samples[self.index]["video_height"]
-        # info["frame_info"]["frame_width"] = self.reader.samples[self.index]["video_width"]
 
         grouped_video_frames = {**grouped_video_frames,
                                 "PLOT": [["captured"]]
@@ -134,7 +258,7 @@ class DataSample(SampleProcessor):
 
         try:
             frame_index = self.frame_index()
-            frame_name = self.video_cap.frames[frame_index-1]
+            frame_name = self.video_cap.frames[frame_index - 1]
             frame_dir = os.path.join(self.video_cap.directory, os.path.dirname(frame_name))
             if grabbed_video and img_names_list is not None:
                 for img_name in img_names_list:
@@ -144,13 +268,12 @@ class DataSample(SampleProcessor):
                         img = np.zeros_like(grouped_video_frames["captured"])
 
                     grouped_video_frames[img_name] = img
-
         except:
             pass
 
         return grabbed_video, grouped_video_frames, grabbed_audio, audio_frames, info, properties
 
-    def get_participant_frame_range(self,participant_id):
+    def get_participant_frame_range(self, participant_id):
         raise NotImplementedError
 
 
@@ -160,6 +283,7 @@ class DataSplitter(object):
     evaluation. The file names are stored in csv files and are not split automatically. This provides an interface
     for manually adding videos to the assigned lists
     """
+
     def __init__(self, train_csv_file="datasets/processed/train.csv",
                  val_csv_file="datasets/processed/validation.csv",
                  test_csv_file="datasets/processed/test.csv",
@@ -173,26 +297,27 @@ class DataSplitter(object):
 
         self.mode = mode
         self.columns = ["video_id", "fps", "scene_type", "dataset"]
+        self.column_types = {"video_id": "string"}
         self.samples = pd.DataFrame(columns=self.columns + ["split"])
         self.open()
 
     def read(self, csv_file, split):
         if csv_file is not None:
             if self.mode == "r":  # read or append
-                samples = pd.read_csv(csv_file, names=self.columns, header=0)
+                samples = pd.read_csv(csv_file, names=self.columns, header=0, dtype=self.column_types)
                 samples["split"] = split
 
                 self.samples = pd.concat([self.samples, samples])
             elif self.mode == "d":  # dynamic: if the pickle_file exists it will be read, otherwise, a new dataset is created
                 if os.path.exists(csv_file):
-                    samples = pd.read_csv(csv_file, names=self.columns, header=0)
+                    samples = pd.read_csv(csv_file, names=self.columns, header=0, dtype=self.column_types)
                     samples["split"] = split
                     self.samples = pd.concat([self.samples, samples])
 
             elif self.mode == "x":  # safe write
                 if os.path.exists(csv_file):
                     raise FileExistsError("Read mode 'x' safely writes a file. "
-                                  "Either delete the csv_file '" + csv_file + "' or change the read mode")
+                                          "Either delete the csv_file '" + csv_file + "' or change the read mode")
 
     def sample(self, video_id, dataset, fps=0, scene_type=None, split=None, mode="d"):
         # the mode specified here controls the sample whereas the class' mode controls the data splits on file
@@ -208,11 +333,14 @@ class DataSplitter(object):
                 self.samples = self.samples.append(match, ignore_index=True)
             else:
                 if fps is not None:
-                    self.samples.loc[(self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset), "fps"] = fps
+                    self.samples.loc[
+                        (self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset), "fps"] = fps
                 if scene_type is not None:
-                    self.samples.loc[(self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset), "scene_type"] = scene_type
+                    self.samples.loc[(self.samples["video_id"] == video_id) & (
+                                self.samples["dataset"] == dataset), "scene_type"] = scene_type
                 if split is not None:
-                    self.samples.loc[(self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset), "split"] = split
+                    self.samples.loc[
+                        (self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset), "split"] = split
                 match = self.samples[(self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset)]
         elif mode == "x":
             match = self.samples[(self.samples["video_id"] == video_id) & (self.samples["dataset"] == dataset)]
@@ -258,6 +386,7 @@ class DataWriter(object):
     Writes the dataset in the format supported by the DataLoader. This writer assumes the structures of
     grouped_video_frames_list and info_list as resulting from annotate_frames in VideoProcessor
     """
+
     def __init__(self, dataset_name, video_name, save_dir="datasets/processed/",
                  output_video_size=(640, 480), frames_per_sec=20,
                  write_images=True, write_videos=False, write_annotations=True):
@@ -277,14 +406,15 @@ class DataWriter(object):
         self.write_annotations = write_annotations
         # loading annotations not needed if they will not be written
         if write_annotations:
-            path_to_pickle = os.path.join(self.save_dir, "Annotations", self.dataset_name,  self.video_name)
+            path_to_pickle = os.path.join(self.save_dir, "Annotations", self.dataset_name, self.video_name)
             if os.path.exists(path_to_pickle):
                 self.annotations = {}
                 for root_dir, dirnames, filenames in sorted(os.walk(path_to_pickle)):
                     for filename in filenames:
                         if filename.endswith(".pkl"):
-                            self.annotations[int(filename.rstrip(".pkl"))] = pickle.load(open(os.path.join(path_to_pickle,
-                                                                                                      filename), "rb"))
+                            self.annotations[int(filename.rstrip(".pkl"))] = pickle.load(
+                                open(os.path.join(path_to_pickle,
+                                                  filename), "rb"))
             else:
                 self.annotations = {}
         else:
@@ -344,14 +474,17 @@ class DataWriter(object):
                 index += 1
             cv2.imwrite(os.path.join(img_path, img_name + "_" + str(index) + ".jpg"), img_array)
         if self.write_videos:
-            if not img_name in self.videos:
+            if img_name in self.videos:
+                pass
+            else:
                 vid_path = os.path.join(write_path.format("Videos"), self.video_name)
                 if not os.path.exists(vid_path):
                     os.makedirs(vid_path, exist_ok=True)
                 video_enc = cv2.VideoWriter_fourcc(*"XVID")
                 self.videos[img_name] = {"writer": cv2.VideoWriter(os.path.join(vid_path, img_name + '.avi'), video_enc,
-                                                                   self.frames_per_sec, self.output_video_size), # 25, (1232,504)), #
-                                        "last_frame": frame_id-1}
+                                                                   self.frames_per_sec, self.output_video_size),
+                                         # 25, (1232,504)), #
+                                         "last_frame": frame_id - 1}
             if self.videos[img_name]["last_frame"] < frame_id:
                 # self.videos[img_name]["writer"].write(cv2.resize(img_array, (1232,504)))
                 self.videos[img_name]["writer"].write(cv2.resize(img_array, self.output_video_size))
@@ -387,4 +520,3 @@ class DataWriter(object):
             self.output_video_size = output_vid_size
         if fps is not None:
             self.frames_per_sec = fps
-

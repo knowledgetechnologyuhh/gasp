@@ -12,7 +12,7 @@ from gazenet.utils.sample_processors import InferenceSampleProcessor
 
 MODEL_PATHS = {
     "seqdamgmualstm": os.path.join("gazenet", "models", "saliency_prediction", "gasp", "checkpoints",
-                                   "pretrained_seqeuncegaspdamencgmualstmconv",
+                                   "pretrained_sequencegaspdamencgmualstmconv",
                                 "SequenceGASPDAMEncGMUALSTMConv", "53ea3d5639d647fc86e3974d6e1d1719", "last_model.pt"),
     "seqdamalstmgmu": os.path.join("gazenet", "models", "saliency_prediction", "gasp", "checkpoints",
                                    "pretrained_sequencegaspdamencalstmgmuconv",
@@ -20,6 +20,9 @@ MODEL_PATHS = {
     "seqdamalstmgmu_110nofer": os.path.join("gazenet", "models", "saliency_prediction", "gasp", "checkpoints",
                                             "pretrained_sequencegaspdamencalstmgmuconv",
                                             "SequenceGASPDAMEncALSTMGMUConv", "ba69921766274fe69363b9cd9b5d4b76", "last_model.pt"), #10
+    "seqdamalstmgmu_101nogf": os.path.join("gazenet", "models", "saliency_prediction", "gasp", "checkpoints",
+                                            "pretrained_sequencegaspdamencalstmgmuconv",
+                                            "SequenceGASPDAMEncALSTMGMUConv", "abd7f5d2c76147f685c3082f5bdb733d", "last_model.pt"), #10
     "damgmu": os.path.join("gazenet", "models", "saliency_prediction", "gasp", "checkpoints",
                            "pretrained_gaspdamencgmuconv",
                            "GASPDAMEncGMUConv", "c9dd4df04e87469ea9914ea67af764b6", "last_model.pt")
@@ -52,6 +55,8 @@ class GASPInference(InferenceSampleProcessor):
         self.inp_img_height = inp_img_height
         self.inp_img_mean = inp_img_mean
         self.inp_img_std = inp_img_std
+
+        self.realtime = None
         # scan model registry
         ModelRegistrar.scan()
 
@@ -60,13 +65,25 @@ class GASPInference(InferenceSampleProcessor):
         self.model = ModelRegistrar.registry[model_name](**kwargs)
         if weights_file in MODEL_PATHS.keys():
             weights_file = MODEL_PATHS[weights_file]
-        self.model.load_state_dict(torch.load(weights_file))
+        self.model.load_model(weights_file=weights_file)
         print("GASP model loaded from", weights_file)
         self.model = self.model.to(device)
         self.model.eval()
+        self.realtime = None
 
     def infer_frame(self, grabbed_video_list, grouped_video_frames_list, grabbed_audio_list, audio_frames_list, info_list, properties_list,
-                    compute_gate_scores=True, inp_img_names_list=None, source_frames_idxs=None, **kwargs):
+                    previous_maps=None, compute_gate_scores=True, inp_img_names_list=None, source_frames_idxs=None, **kwargs):
+        # when realtime data is passed to gasp
+        # infer whether GASP is running in realtime mode i.e., SCD execution online or offline (from preprocessed data)
+        if self.realtime is None:
+            if all(inp_img_name in grouped_video_frames_list[0] for inp_img_name in inp_img_names_list):
+                self.realtime = False
+            else:
+                self.realtime = True
+
+        if previous_maps is not None and self.realtime:
+            grouped_video_frames_list = list(previous_maps.values())
+            grabbed_video_list = [True]*len(grouped_video_frames_list)
 
         frames_idxs = range(len(grouped_video_frames_list)) if source_frames_idxs is None else source_frames_idxs
         for f_idx, frame_id in enumerate(frames_idxs):
@@ -103,35 +120,40 @@ class GASPInference(InferenceSampleProcessor):
     def preprocess_frames(self, previous_data, inp_img_names_list=None, **kwargs):
         features = super().preprocess_frames(**kwargs)
         features["inp_img_names_list"] = inp_img_names_list
-        # previous_maps = {}
-        # if previous_data is None:
-        #     previous_data = ((None, features["grouped_video_frames_list"], None, None, features["info_list"]),)
-        #
-        # for result in previous_data:
-        #     if isinstance(result, tuple):
-        #         # keep the frames object and extract the id from the info
-        #         # if keep_frames is None or result[keep_frames
-        #         for f_idx, frame_data in enumerate(result[4]):
-        #             for plot_name, plot in result[1][f_idx].items():
-        #                 if plot_name != "PLOT" and (keep_plot_names is None or plot_name in keep_plot_names):
-        #                     if frame_data["frame_info"]["frame_id"] in previous_maps:
-        #                         if plot_name in previous_maps[frame_data["frame_info"]["frame_id"]]:
-        #                             previous_maps[frame_data["frame_info"]["frame_id"]][plot_name].append(plot)
-        #                         else:
-        #                             previous_maps[frame_data["frame_info"]["frame_id"]].update(**{plot_name: [plot]})
-        #                     else:
-        #                         previous_maps[frame_data["frame_info"]["frame_id"]] = {plot_name: [plot]}
-        #     features["previous_maps"] = previous_maps
+        previous_maps = {}
+        if previous_data is None:
+            previous_data = ((None, features["grouped_video_frames_list"], None, None, features["info_list"]),)
+
+        for result in previous_data:
+            if isinstance(result, tuple):
+                for f_idx, frame_data in enumerate(result[4]):
+                    for plot_name, plot in result[1][f_idx].items():
+                        if plot_name != "PLOT" and (inp_img_names_list is None or plot_name in inp_img_names_list):
+                            if f_idx in previous_maps:
+                                if plot_name in previous_maps[f_idx]:
+                                    previous_maps[f_idx][plot_name] = plot
+                                else:
+                                    previous_maps[f_idx].update(**{plot_name: plot})
+                            else:
+                                previous_maps[f_idx] = {plot_name: plot}
+                    previous_maps[f_idx]["PLOT"] = [[]]
+            features["previous_maps"] = previous_maps
         return features
 
     def annotate_frame(self, input_data, plotter,
                        show_det_saliency_map=True,
+                       show_peak_only=False,
                        enable_transform_overlays=True,
                        color_map=None,
                        **kwargs):
+        # TODO (fabawi): This is a hack to avoid coloring the final output. Remove hard coding of color here
+        color_map = "bone"
+
         grabbed_video, grouped_video_frames, grabbed_audio, audio_frames, info, properties = input_data
 
-        properties = {**properties, "show_det_saliency_map": (show_det_saliency_map, "toggle", (True, False))}
+        properties = {**properties,
+                      "show_det_saliency_map": (show_det_saliency_map, "toggle", (True, False)),
+                      "show_peak_only": (show_peak_only, "toggle", (True, False))}
 
         grouped_video_frames = {**grouped_video_frames,
                                 "PLOT": grouped_video_frames["PLOT"] + [["det_source_" + self.short_name,
@@ -140,11 +162,19 @@ class GASPInference(InferenceSampleProcessor):
                                 "det_transformed_" + self.short_name: grouped_video_frames["captured"]
                                 if enable_transform_overlays else np.zeros_like(grouped_video_frames["captured"])}
 
-        for saliency_map_name, frame_name in zip(["saliency_maps"],[""]):
+        for saliency_map_name, frame_name in zip(["saliency_maps"], [""]):
             if grabbed_video:
                 if show_det_saliency_map:
-                    saliency_map = info["frame_detections_" + self.short_name][saliency_map_name][0][0]
+                    if show_peak_only:
+                        saliency_map = info["frame_detections_" + self.short_name][saliency_map_name][0][0]
+                        frame_transformed = plotter.plot_color_map(np.uint8(255 * saliency_map), color_map=color_map)
+                        peak_position = np.array([list(np.unravel_index(np.argmax(saliency_map), saliency_map.shape))+[1]])
+                        saliency_map = plotter.plot_fixations_density_map(frame_transformed, peak_position,
+                                                                          xy_std=(6, 3), alpha=1, color_map=color_map)
+                    else:
+                        saliency_map = info["frame_detections_" + self.short_name][saliency_map_name][0][0]
                     frame_transformed = plotter.plot_color_map(np.uint8(255 * saliency_map), color_map=color_map)
+
                     if enable_transform_overlays:
                         frame_transformed = plotter.plot_alpha_overlay(grouped_video_frames["det_transformed_" +
                                                                                             frame_name + self.short_name],
