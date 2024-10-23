@@ -1,0 +1,12 @@
+video_id,auditory_localization,visualcue_localization,conditions_congruency,fix_duration_1,fix_duration_2
+LL-100-700,left,left,congruent,100,700
+LL-100-800,left,left,congruent,100,800
+LL-100-900,left,left,congruent,100,900
+LL-200-700,left,left,congruent,200,700
+LL-200-800,left,left,congruent,200,800
+LL-200-900,left,left,congruent,200,900
+LL-300-700,left,left,congruent,300,700
+LL-300-800,left,left,congruent,300,800
+LL-300-900,left,left,congruent,300,900
+LN-000-700,left,normal,neutral,000,700
+RN-000-700,right,normal,neutral,000,700
