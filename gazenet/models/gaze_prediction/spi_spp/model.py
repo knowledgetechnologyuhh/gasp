@@ -22,7 +22,7 @@ class SPPGASPBase(GASPBase):
         self.num_classes = num_classes
         self.part_loss_weight = part_loss_weight
 
-        # CAREFUL (fabawi): the following loss_weights_named are signed and inverted
+        # WARNING (fabawi): the following loss_weights_named are signed and inverted
         self.loss_weights_named.update(**{"part_nll_loss": 1/self.part_loss_weight})
 
         self.accuracy_metric = torchmetrics.Accuracy(multiclass=True, num_classes=self.num_classes)
