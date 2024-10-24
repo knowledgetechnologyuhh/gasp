@@ -17,7 +17,7 @@ setup(
     maintainer_email='fares.abawi@uni-hamburg.de',
     description='Social cue integration for dynamic saliency prediction',
     extras_require={
-        "RobotAudioVisualCongruency":
+        'RobotAudioVisualCongruency':
             ['dash==1.11.0',
              'dash-bootstrap-components==0.9.2',
              'ffpyplayer==4.3.2',
@@ -66,13 +66,13 @@ setup(
             ],
         },
     exclude_package_data={
-        "datasets": ["*.zip", "*.7z", "*.tar.gz", "*.ptb", "*.ptb.tar", "*.npy", "*.npz", "*.hd5", "*.txt", "*.jpg", "*.png", "*.gif", "*.avi", "*.mp4", "*.wav", "*.mp3"]},
+        'datasets': ["*.zip", "*.7z", "*.tar.gz", "*.ptb", "*.ptb.tar", "*.npy", "*.npz", "*.hd5", "*.txt", "*.jpg", "*.png", "*.gif", "*.avi", "*.mp4", "*.wav", "*.mp3"]},
     package_data={
-        "": ["datasets/processed/center_bias.jpg", "datasets/processed/center_bias_bw.jpg",
-             "datasets/wtmsimgaze2020/videos/*.mp4"],
+        '': ['datasets/processed/center_bias.jpg', 'datasets/processed/center_bias_bw.jpg',
+             'datasets/wtmsimgaze2020/videos/*.mp4'],
     },
     data_files=[
-        ("datasets/processed/", ["datasets/processed/center_bias.jpg", "datasets/processed/center_bias_bw.jpg"]),
-        ("datasets/wtmsimgaze2020/videos/", get_files_in_directory('datasets/wtmsimgaze2020/videos/', '.mp4'))
+        ('datasets/processed/', ['datasets/processed/center_bias.jpg', 'datasets/processed/center_bias_bw.jpg']),
+        ('datasets/wtmsimgaze2020/videos/', get_files_in_directory('datasets/wtmsimgaze2020/videos/', '.mp4'))
     ]
     )
