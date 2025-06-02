@@ -20,6 +20,9 @@ This is the official [GASP](http://software.knowledge-technology.info/#gasp) cod
   url          = "https://www2.informatik.uni-hamburg.de/wtm/publications/2021/AWW21/Abawi_IJCAI21.pdf"
 }
 ```
+## Latest Extension (2025)
+
+**[Unified Scanpath Predictor (USP)](https://github.com/fabawi/USP)** `🆕 2025` - Individual human scanpath prediction using a single unified model.
 
 ## Architecture Overview
 
